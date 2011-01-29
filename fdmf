@@ -110,6 +110,7 @@ sub sonic_reduce {
   if ( $pid1 == 0 ) {    # we are child 1 (the decoder)
     close( PIPE1_OUT ) or die "$!";
     open( STDOUT, ">&PIPE1_IN" ) or die "$!";
+    open( STDERR, ">cmd.log" )   or die "$!";
     exec @DECODE_CMD or die "$!";
   }
   else {    # we are still the parent (having had one child of two)
