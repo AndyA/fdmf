@@ -1,3 +1,6 @@
 *.o
+.*.swp
+Session.vim
+cmd.log
 sonic_reducer
 vector_pairs
