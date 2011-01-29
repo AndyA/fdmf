@@ -149,24 +149,18 @@ sub decode_cmd {
   # These also work, if you don't want to use mplayer:
   #	@$cmd_ref = ("mpg123", "-s", "-q", "$f");
   #	@$cmd_ref = ("ogg123", "-d", "raw", "-f", "-", "$f");
-  my $f                  = shift;
-  my $cmd_ref            = shift;
-  my $filename_extension = lc substr $f, -3;
-  if ( $filename_extension =~ /mp3|ogg|m4a|wma|wav|\.ra/ ) {
-    #		@$cmd_ref = ("mplayer", "-nortc", "-ao", "pcm",
-    #						"-aofile", "/dev/stdout", "$f");
-    @$cmd_ref = (
-      "mplayer", "-really-quiet", "-ao",
-      "pcm:nowaveheader:file=/dev/stdout", "$f"
-    );
+  my $f       = shift;
+  my $cmd_ref = shift;
 
+  if ( $f =~ /\.(?:mp3|ogg|m4a|wma|wav|ra|aiff)$/i ) {
+    @$cmd_ref
+     = ( 'ffmpeg', '-i', $f, '-acodec', 'pcm_s16le', '-f', 'wav', '-' );
     return 0;
   }
-  else {
-    print STDERR
-     "Filename $f doesn't have an extension that we handle.\n";
-    return -1;
-  }
+
+  print STDERR
+   "Filename $f doesn't have an extension that we handle.\n";
+  return -1;
 }
 
 sub find_sr {
