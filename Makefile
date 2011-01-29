@@ -1,7 +1,7 @@
 # This makefile should not exist as such.  There should be a configure script.
 
 CC =  gcc
-CFLAGS = -O2 -W -Wall -I/usr/local/include -L/usr/local/lib
+CFLAGS = -O2 -W -Wall -I/usr/local/include -L/usr/local/lib -I/opt/local/include -L/opt/local/lib
 
 COMOBJS = read_from_fd.o \
 	pad.o 
