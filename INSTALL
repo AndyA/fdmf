@@ -1,0 +1,16 @@
+fdmf requires:
+	
+	perl - because part of fdmf is written in perl
+	mplayer - to decode mp3 files to raw binary data  
+	mpg123 - to decode mp3 files to raw binary data (optional)
+	ogg123 - to decode ogg files to raw binary data (optional)
+	plotutils - for the spline program 
+	fftw - for calculating the power spectrum  
+	gdbm for database access
+	Digest::MD5 perl module
+Untar the fdmf tarball.
+cd to the fdmf-<version> directory.
+Type make.
+See README for instructions on how to run fdmf.
+
+

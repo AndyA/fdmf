@@ -1,0 +1,197 @@
+#!/usr/bin/perl -w
+# Kurt Rosenfeld 2004, 2005, 2006
+# GPL
+use strict;
+use GDBM_File;
+use Digest::MD5 qw(md5);
+use Encode qw(encode_utf8);
+use File::Copy;
+use File::Basename;
+use Cwd;
+
+my $db_file = glob '~/.fdmf';
+my $musicdir = $ARGV[0] or die "RTFM";
+my $NUM_BANDS = 4;
+
+my $SONICREDUCER = find_sr() or die "Can't find good sonic_reducer";
+
+die "Unable to run spline.  Is it in your path?" if `spline /dev/null`;
+
+# We cache the table of filenames and their envelope spectra.
+if (stat $db_file) {  # keep the old db file just in case
+	File::Copy::copy "$db_file", "$db_file.old" or die "copy: $!";
+}
+
+tie my %DB, 'GDBM_File', glob("$db_file"), &GDBM_WRCREAT|&GDBM_SYNC, 0640;
+# If your perl/GDBM can't do SYNC mode, comment the line above and use this:
+#tie my %DB, 'GDBM_File', glob("$db_file"), &GDBM_WRCREAT, 0640;
+
+# Recurse through the directory, searching for mp3s
+my @filelist = recurse_from_dir($musicdir);
+
+# Compare that filelist to the already-cached files in the database.
+my @uncached = grep((not $DB{"$_"}), @filelist);
+
+my $filecount = 0; 
+
+print STDERR "Found ",$#filelist+1," files, ",$#uncached+1," uncached.\n";
+
+# this loop will add any uncached files to the database
+FILE: for my $file (@uncached) {
+	open(FILE, $file) or die "Can't open $file: $!";
+	my $file_md5 = Digest::MD5->new->addfile(*FILE)->digest;
+	print STDERR $filecount++, "/", $#uncached, " waiting on $file\n";
+	# If an identical file is already indexed, reuse its summary.
+	foreach my $k (keys %DB) {
+		my $db_file_md5 = substr $DB{$k}, 100, 16;
+		if ($file_md5 eq $db_file_md5) {
+			print STDERR "Identical files (using cached summary):\n";
+			print STDERR "\t$file\n\t\tAND\n\t$k\n";
+			my $cached_summary  = substr $DB{$k}, 0, 96;
+			$DB{$file} = $cached_summary . base_hash($file) . $file_md5;
+			next FILE;
+		}
+	}
+	my $summary;
+	next FILE if sonic_reduce($file, \$summary);
+	$DB{$file} = $summary . base_hash($file) . $file_md5;
+} # post: %DB is complete
+
+untie %DB;
+
+#####################################################################
+########################## THE END ##################################
+#####################################################################
+
+sub base_hash {
+	substr md5(encode_utf8(basename(shift()))), 0, 4;
+}
+
+
+sub recurse_from_dir {
+	my ($dir) = @_;
+	my @filelist;
+	my $file_ptrn = '^[^.]'; # ignore dot files
+
+	unless (opendir(PARSEDIR, "$dir")) { 
+		printf STDERR "skipping $dir because $!\n"; 
+		return;
+   	}
+	
+	foreach my $file (sort(readdir(PARSEDIR))) {
+		my $fullname = $dir . "/" . $file;
+		$fullname =~ s/\/+/\//g;
+		if (-d $fullname && $file !~ /^\..*/) {
+			push @filelist, recurse_from_dir($fullname);
+		}
+		elsif ($file =~ /$file_ptrn/i && -r $fullname) {
+			$filelist[++$#filelist] = $fullname;
+		}
+	}
+	closedir(PARSEDIR);
+	return @filelist;
+}
+
+
+sub sonic_reduce {	
+	# ARGUMENT: filename of music file
+	# RETURN by REFERENCE: 768-bit string for fdmf database
+	# RETURN VALUE: 0 for success, nonzero for nonsuccess.
+	my $f =  shift;
+	my $summary_ref = shift;
+	my @SR;
+	my @DECODE_CMD;
+	return -1 if decode_cmd($f, \@DECODE_CMD);
+
+	pipe PIPE1_OUT, PIPE1_IN;
+
+	my $pid1 = fork;
+	if ($pid1 == 0) { # we are child 1 (the decoder)
+		close(PIPE1_OUT) or die "$!";
+		open(STDOUT, ">&PIPE1_IN") or die "$!";
+		exec @DECODE_CMD or die "$!";
+	}
+	else { # we are still the parent (having had one child of two)
+		close(PIPE1_IN) or die; # child 1 will write on this
+		pipe PIPE2_OUT, PIPE2_IN;
+		my $pid2 = fork;
+		if ($pid2 == 0) { # we are child 2 (the sonic_reducer process)
+			close(PIPE2_OUT) or die "$!";
+			open(STDIN,  "<&PIPE1_OUT") or die "$!";
+			open(STDOUT, ">&PIPE2_IN") or die "$!";
+			exec $SONICREDUCER or die "$!";
+		}
+		else { # we are still the parent (having had both children)
+			close(PIPE2_IN) or die "$!";
+			@SR = <PIPE2_OUT>;
+		}
+		waitpid $pid1, 0;
+		waitpid $pid2, 0;
+	} 
+
+	if ($#SR != 767) {
+		print STDERR "sonic_reduce had trouble with $f.  Corrupt audio file?\n";
+		return -2;
+	}
+	my @e = @SR[0   .. 255]; # energy spectrum summary	
+	my @r = @SR[256 .. 511]; # ratio (high/low) spectrum summary	
+	my @t = @SR[512 .. 767]; # twist (odd/even ratio) spectrum summary	
+	my $j = join("", quantize(@e), quantize(@r), quantize(@t)); 
+	$$summary_ref = pack("b*", $j);
+	return 0;
+}
+
+sub decode_cmd { 
+	# This routine looks at the filename extension of a music file.
+	# It returns the shell command for decoding it.
+	# These also work, if you don't want to use mplayer:
+	#	@$cmd_ref = ("mpg123", "-s", "-q", "$f"); 
+	#	@$cmd_ref = ("ogg123", "-d", "raw", "-f", "-", "$f");
+	my $f = shift;
+	my $cmd_ref = shift;
+	my $filename_extension = lc substr $f, -3;
+	if ($filename_extension =~ /mp3|ogg|m4a|wma|wav|\.ra/) {
+#		@$cmd_ref = ("mplayer", "-nortc", "-ao", "pcm", 
+#						"-aofile", "/dev/stdout", "$f");
+		@$cmd_ref = ("mplayer", "-really-quiet", "-ao", "pcm:nowaveheader:file=/dev/stdout", "$f");
+
+		return 0;
+	}
+	else {
+		print STDERR "Filename $f doesn't have an extension that we handle.\n";
+		return -1;
+	}
+}
+
+
+sub find_sr {
+	my $sr_path;
+	$sr_path = dirname($0) . "/sonic_reducer"; # look in same dir as fdmf
+	return $sr_path if -x $sr_path;
+	$sr_path = getcwd() . "/sonic_reducer"; # look in the current directory
+	return $sr_path if -x $sr_path;
+	return 0; # we failed to find sonic_reducer	
+}	
+
+sub quantize { 
+	# one bit quantize with median value as threshold
+	my @s;
+	my $median = median(@_);
+	foreach my $i (0 .. $#_) {
+		$s[$i] = ($_[$i] > $median) ? 1 : 0;
+	}
+	return @s;
+}
+
+sub median {
+	my $size;
+	my $median;
+	my @sorted = sort {$a <=> $b} @_;
+	$size = scalar @sorted;
+	if ($size % 2){
+	    $median = $sorted[($size-1)/2];
+	}
+	else {
+		$median = ($sorted[$size/2] + $sorted[($size/2)-1])/2;
+	}
+}

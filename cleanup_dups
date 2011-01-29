@@ -1,0 +1,38 @@
+#!/usr/bin/perl -w
+# Kurt Rosenfeld 2004
+
+# This is an template/example for developing your own duplicate handling
+# policies.  This program, in its current state, reads in pairs of filenames
+# delimited by null bytes.  It checks to see which file is smaller, and
+# copies the smaller file to the $rejected_dup_dir.  The intended usage is 
+# this: 
+#	./vector_pairs -0 | ./cleanup_dups
+# This will have vector_pairs use null bytes as its output delimiter 
+# instead of human-readable \t and \n bytes.  This program will thereby
+# be able to unambiguiously parse its input.  In general, music files
+# tend to have lots of shell-unfriendly characters in them.  
+# Don't do this in bash (for example):
+#	for i in `find . -name "*mp3"`; do mpg123 $i; done   
+# Do this instead:
+#	find ./ -name "*mp3" -print0 | xargs -0 -n 1 mpg123
+
+use File::stat;
+use File::Copy;
+
+my $rejected_dup_dir = "/tmp/rejects";
+
+$/ = "\0";
+while(<>) {
+	my $file1 = $_;
+	chomp($file1);
+	my $file2 = <>;	
+	chomp($file2);
+	my $size1 = stat($file1)->size;
+	my $size2 = stat($file2)->size;
+	my $rejected_file = ($size2 < $size1) ? $file2 : $file1;
+	# Please be careful and remember to backup your data.
+	# This thing could easily become a file eating monster.
+	
+#	move $rejected_file, $rejected_dup_dir or die "$!";
+	copy $rejected_file, $rejected_dup_dir or die "$!";
+}

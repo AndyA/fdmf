@@ -1,0 +1,38 @@
+0.0.9s uses a new command line for calling mplayer.  The sourcecode is
+now all in one directory.  
+
+0.0.9q uses a new command line for calling mplayer.  The "correct" command
+line for mplayer seems to change with different mplayer versions.  
+
+
+0.0.9p handles a recent change in mplayer command line arguments.  It switches
+between the old format and the new format based on mplayer's response to the 
+mplayer --help invocation.  This version also introduces a feature of checking
+to see whether both files actually exist before printing that the match was
+found.  This allows you to leave your ~/.fdmf database alone and let it grow.
+Old deleted "ghost" files in the database will not be considered matches, but
+these records are useful to keep because if an identical file is encountered 
+later with a different name, the cached summary will be used, which is a huge 
+speedup.  This feature can be disabled in vector_pairs.h for special uses.
+
+0.0.9o (unreleased stupid experiment)
+
+0.0.9n uses mplayer by default for decoding music files.  The reason for this
+is that mplayer is faster than mpg123 for decoding mp3 files to raw pcm.  
+Also, fdmf will no longer exit if it encounters a directory that it cannot
+read.  It just prints a warning and continues.  README and INSTALL have
+been updated.  Supported file formats (via mplayer) are mp3, ogg, m4a, wav,
+wma, and realaudio.  Basically, whatever mplayer will play will work in fdmf.
+
+0.0.9m is the first fdmf version that tries to completely avoid using the
+shell.  Passing arguments to external programs through the shell had been
+causing a lot of quoting/escaping problems. 
+
+0.0.9l fixes several string handling bugs.  fdmf no longer
+calls the openssl program.  It uses Digest::MD5 to compute hashes.
+
+0.0.9j adds a check to the fdmf perl script to see if the MD5
+hash of the data of the file that we are currently processing is the same as
+the MD5 hash of the data of another file that we have already indexed.  If
+it is, we now skip running sonic_reduce() and instead simply reuse the 
+summary vector that is in the database for the other file.

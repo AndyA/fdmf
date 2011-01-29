@@ -1,0 +1,25 @@
+#!/bin/bash
+
+#This script searches for the parameter values that
+#produce the minimum total number of errors while 
+#processing a set of test data.  It first does a 
+#rough sampling of the parameter space, and then
+#zooms in on the best region.  This process is
+#repeated, hopefully converging on the best
+#parameter values.  
+
+
+
+./fdmf_bench 120 120 120 100 50;
+best=$(sort -n -k 4 gpd | head -1 | cut -f 1-3);
+
+./fdmf_bench $best 60 30;
+best=$(sort -n -k 4 gpd | head -1 | cut -f 1-3);
+
+./fdmf_bench $best 30 15;
+best=$(sort -n -k 4 gpd | head -1 | cut -f 1-3);
+
+./fdmf_bench $best 15 5;
+best=$(sort -n -k 4 gpd | head -1 | cut -f 1-3);
+
+
