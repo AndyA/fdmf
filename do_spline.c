@@ -14,5 +14,5 @@ void do_spline(fftw_complex *spline_in, int c) {
 		if (i < 2) mag = 0;
 		fprintf(spline, "%f %f\n", freq, mag);
 	}
-	fclose(spline);
+	pclose(spline);
 }
