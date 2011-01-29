@@ -1,7 +1,8 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 # Kurt Rosenfeld 2004, 2005, 2006
 # GPL
 use strict;
+use warnings;
 use GDBM_File;
 use Digest::MD5 qw(md5);
 use Encode qw(encode_utf8);
