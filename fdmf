@@ -133,7 +133,7 @@ sub sonic_reduce {
 
   if ( $#SR != 767 ) {
     print STDERR
-     "sonic_reduce had trouble with $f.  Corrupt audio file?\n";
+     "sonic_reducer had trouble with $f.  Corrupt audio file?\n";
     return -2;
   }
   my @e = @SR[ 0 .. 255 ];     # energy spectrum summary
