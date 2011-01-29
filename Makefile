@@ -39,5 +39,8 @@ vector_pairs : vector_pairs.h vector_pairs.o $(VPOBJS)
 	$(CC) $(CFLAGS) vector_pairs.c -lm -lgdbm -o $@ $(VPOBJS) 
 
 clean :  
-	rm -f *.o vector_pairs sonic_reducer $(OBJS)
+	rm -f *.o vector_pairs sonic_reducer $(OBJS) tags
 
+.PHONY: tags
+tags :
+	ctags *.c *.h
