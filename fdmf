@@ -155,7 +155,8 @@ sub decode_cmd {
 
   if ( $f =~ /\.(?:mp3|ogg|m4a|wma|wav|ra|aiff)$/i ) {
     @$cmd_ref
-     = ( 'ffmpeg', '-i', $f, '-acodec', 'pcm_s16le', '-f', 'wav', '-' );
+     = ( 'ffmpeg', '-i', $f, '-acodec', 'pcm_s16le', '-f', 's16le',
+      '-' );
     return 0;
   }
 
