@@ -67,8 +67,7 @@ sub fdmf {
       return if /^\./;
       return unless can_handle( $_ );
       process( $_ );
-    },
-    no_chdir => 1
+     }
   }, @obj;
 }
 
