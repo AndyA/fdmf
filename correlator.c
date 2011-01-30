@@ -251,9 +251,10 @@ correlate( const struct phash *data, size_t nent, size_t * nused ) {
   for ( pi = data; pi; pi = pi->next ) {
     for ( pj = pi->next; pj; pj = pj->next ) {
       /* don't know if this summary stuff is worth the bother */
-      printf( "." );
+      fprintf( stderr, "." );
       if ( *nused == nent
            && best_distance( pi, pj ) >= c[*nused - 1].distance ) {
+        printf( "*" );
         continue;
       }
       distance = hash_distance( pi, pj, bitcount );
@@ -262,7 +263,7 @@ correlate( const struct phash *data, size_t nent, size_t * nused ) {
       }
     }
   }
-  printf( "\n" );
+  fprintf( stderr, "\n" );
   return c;
 }
 
