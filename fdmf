@@ -5,12 +5,12 @@
 use strict;
 use warnings;
 
-use GDBM_File;
-use Digest::MD5 qw(md5);
-use Encode qw(encode_utf8);
-use File::Copy;
-use File::Basename;
 use Cwd;
+use Digest::MD5 qw( md5 );
+use Encode qw( encode_utf8 );
+use File::Basename;
+use File::Copy;
+use GDBM_File;
 
 my $db_file   = glob '~/.fdmf';
 my $musicdir  = $ARGV[0] or die "RTFM";
