@@ -254,7 +254,7 @@ correlate( const struct phash *data, size_t nent, size_t * nused ) {
       fprintf( stderr, "." );
       if ( *nused == nent
            && best_distance( pi, pj ) >= c[*nused - 1].distance ) {
-        printf( "*" );
+        fprintf( stderr, "*" );
         continue;
       }
       distance = hash_distance( pi, pj, bitcount );
