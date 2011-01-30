@@ -85,35 +85,38 @@ sub process {
 
   return if exists $DB->{h}{$hash};
   mention "Analysing $file";
-  $DB->{h}{$hash} = sonic_reduce( $file );
+  $DB->{h}{$hash} = eval { sonic_reduce( $file ) };
+  print STDERR "Error processing $file: $@\n" if $@;
 }
 
 sub sonic_reduce {
   my $f = shift;
 
-  run(
-    (
-      $f =~ /\.gz$/i
-      ? [ find_prog( 'gzip' ), '-cd', $f ]
-      : [ find_prog( 'cat' ), $f ]
-    ),
-    '|',
-    [
-      find_prog( 'ffmpeg' ),
-      '-i', '-', '-acodec', 'pcm_s16le', '-f', 's16le', '-'
-    ],
-    '2>',
-    \( my $ffmpeg_err ),
-    '|',
-    [ find_prog( 'sonic_reducer', $FindBin::Bin ) ],
-    '>',
-    \( my $out )
-  );
+  my @pipe = ();
+  my $ff   = $f;
+
+  if ( $f =~ /\.gz$/i ) {
+    push @pipe, [ find_prog( 'gzip' ), '-cd', $f ], '|';
+    $ff = '-';
+  }
+
+  push @pipe,
+   [
+    find_prog( 'ffmpeg' ),
+    '-i', $ff, '-acodec', 'pcm_s16le', '-f', 's16le', '-'
+   ],
+   '2>', \( my $ffmpeg_err ), '|',
+   [ find_prog( 'sonic_reducer', $FindBin::Bin ) ], '>', \( my $out );
+
+  run @pipe;
 
   chomp $out;
   my @data = split /\n/, $out;
-  die "sonic_reducer produced strange results\n"
-   unless @data == 768;
+  unless ( @data == 768 ) {
+    print STDERR "ffmpeg error output:\n$ffmpeg_err\n\n",
+     "sonic_reducer output:\n$out\n\na";
+    die "sonic_reducer produced strange results\n";
+  }
 
   return unpack 'H*', pack 'b*',
    join '', quantize( @data[ 0 .. 255 ] ),
