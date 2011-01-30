@@ -113,7 +113,7 @@ sub sonic_reduce {
   my @data = split /\n/, $out;
   unless ( @data == 768 ) {
     print STDERR "ffmpeg error output:\n$ffmpeg_err\n\n",
-     "sonic_reducer output:\n$out\n\na";
+     "sonic_reducer output:\n$out\n\n";
     die "sonic_reducer produced strange results\n";
   }
 
