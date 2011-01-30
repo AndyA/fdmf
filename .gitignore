@@ -2,6 +2,7 @@
 .*.swp
 Session.vim
 cmd.log
+correlator
 sonic_reducer
 tags
 vector_pairs
