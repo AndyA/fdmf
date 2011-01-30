@@ -284,7 +284,7 @@ main( int argc, char *argv[] ) {
     fclose( fl );
   }
 
-  dump_phash( data );
+/*  dump_phash( data );*/
   c = correlate( data, nent, &nused );
   show_correlation( c, nused );
   free_phash( data );
