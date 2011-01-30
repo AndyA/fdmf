@@ -30,7 +30,9 @@ SROBJS = chunk_metrics.o \
 	calc_band_energies.o \
 	destroy_plans.o
 
-all : vector_pairs sonic_reducer
+all : vector_pairs sonic_reducer correlator
+
+correlator : correlator.o
 
 sonic_reducer : sonic_reducer.o $(COMOBJS) $(SROBJS)
 	$(CC) $(CFLAGS) -lfftw3 -lm sonic_reducer.c -o $@ $(COMOBJS) $(SROBJS) -lfftw3
@@ -39,7 +41,7 @@ vector_pairs : vector_pairs.h vector_pairs.o $(VPOBJS)
 	$(CC) $(CFLAGS) vector_pairs.c -lm -lgdbm -o $@ $(VPOBJS) 
 
 clean :  
-	rm -f *.o vector_pairs sonic_reducer $(OBJS) tags
+	rm -f *.o vector_pairs sonic_reducer correlator $(OBJS) tags
 
 .PHONY: tags
 tags :
