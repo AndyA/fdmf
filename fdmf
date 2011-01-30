@@ -1,8 +1,10 @@
 #!/usr/bin/env perl
 # Kurt Rosenfeld 2004, 2005, 2006
 # GPL
+
 use strict;
 use warnings;
+
 use GDBM_File;
 use Digest::MD5 qw(md5);
 use Encode qw(encode_utf8);
@@ -20,19 +22,18 @@ die "Unable to run spline.  Is it in your path?" if `spline /dev/null`;
 
 # We cache the table of filenames and their envelope spectra.
 if ( stat $db_file ) {    # keep the old db file just in case
-  File::Copy::copy "$db_file", "$db_file.old" or die "copy: $!";
+  File::Copy::copy $db_file, "$db_file.old" or die "copy: $!";
 }
 
-tie my %DB, 'GDBM_File', glob( "$db_file" ), &GDBM_WRCREAT | &GDBM_SYNC,
- 0640;
+tie my %DB, 'GDBM_File', $db_file, &GDBM_WRCREAT | &GDBM_SYNC, 0640;
 # If your perl/GDBM can't do SYNC mode, comment the line above and use this:
-#tie my %DB, 'GDBM_File', glob("$db_file"), &GDBM_WRCREAT, 0640;
+#tie my %DB, 'GDBM_File', $db_file, &GDBM_WRCREAT, 0640;
 
 # Recurse through the directory, searching for mp3s
 my @filelist = recurse_from_dir( $musicdir );
 
 # Compare that filelist to the already-cached files in the database.
-my @uncached = grep( ( not $DB{"$_"} ), @filelist );
+my @uncached = grep( ( not $DB{$_} ), @filelist );
 
 my $filecount = 0;
 
@@ -75,7 +76,7 @@ sub recurse_from_dir {
   my @filelist;
   my $file_ptrn = '^[^.]';    # ignore dot files
 
-  unless ( opendir( PARSEDIR, "$dir" ) ) {
+  unless ( opendir( PARSEDIR, $dir ) ) {
     printf STDERR "skipping $dir because $!\n";
     return;
   }
@@ -148,8 +149,8 @@ sub decode_cmd {
   # This routine looks at the filename extension of a music file.
   # It returns the shell command for decoding it.
   # These also work, if you don't want to use mplayer:
-  #	@$cmd_ref = ("mpg123", "-s", "-q", "$f");
-  #	@$cmd_ref = ("ogg123", "-d", "raw", "-f", "-", "$f");
+  #	@$cmd_ref = ("mpg123", "-s", "-q", $f);
+  #	@$cmd_ref = ("ogg123", "-d", "raw", "-f", "-", $f);
   my $f       = shift;
   my $cmd_ref = shift;
 
