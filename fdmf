@@ -93,8 +93,8 @@ sub sonic_reduce {
 
   run(
     (
-      $f =~ /~\.gz$/i
-      ? [ find_prog( 'gzip' ), '-d', $f ]
+      $f =~ /\.gz$/i
+      ? [ find_prog( 'gzip' ), '-cd', $f ]
       : [ find_prog( 'cat' ), $f ]
     ),
     '|',
