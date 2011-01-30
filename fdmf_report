@@ -14,7 +14,7 @@ my %ph2f = ();
 while ( my ( $name, $sig ) = each %{ $DB->{f} } ) {
   if ( my $hash = $DB->{i}{$sig} ) {
     my $phash = $DB->{h}{$hash};
-    $ph2f{$phash} = $name if defined $phash;
+    $ph2f{$phash}{$name}++ if defined $phash;
   }
 }
 
@@ -22,8 +22,19 @@ while ( <> ) {
   chomp;
   my ( $distance, $this, $that ) = split;
   die "Bad input\n" unless defined $that && $distance =~ /^\d+$/;
-  printf "%s\n%s\n%s\n\n", $distance, $ph2f{$this} || $this,
-   $ph2f{$that} || $that;
+  print join( "\n",
+    $distance,
+    names_for_phash( $this ),
+    names_for_phash( $that ) ),
+   "\n";
+}
+
+sub names_for_phash {
+  my $phash = shift;
+  if ( $ph2f{$phash} ) {
+    return sort keys %{ $ph2f{$phash} };
+  }
+  return "phash:$phash";
 }
 
 sub get_db {
