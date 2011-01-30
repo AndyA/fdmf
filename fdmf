@@ -6,199 +6,179 @@ use strict;
 use warnings;
 
 use Cwd;
-use Digest::MD5 qw( md5 );
-use Encode qw( encode_utf8 );
+use Digest::SHA1 qw( sha1 );
 use File::Basename;
-use File::Copy;
-use GDBM_File;
+use File::Find;
+use File::Spec;
+use File::Which;
+use FindBin;
+use Getopt::Long;
+use IPC::Run qw( run );
+use Memoize;
+use Storable;
 
-my $db_file   = glob '~/.fdmf';
-my $musicdir  = $ARGV[0] or die "RTFM";
-my $NUM_BANDS = 4;
+use constant DBFILE => glob '~/.fdmf';
 
-my $SONICREDUCER = find_sr() or die "Can't find good sonic_reducer";
+my %Opt = ( verbose => 0 );
 
-die "Unable to run spline.  Is it in your path?" if `spline /dev/null`;
+memoize qw( find_prog );
 
-# We cache the table of filenames and their envelope spectra.
-if ( stat $db_file ) {    # keep the old db file just in case
-  File::Copy::copy $db_file, "$db_file.old" or die "copy: $!";
+find_prog( 'spline' );
+
+GetOptions( 'verbose' => \$Opt{verbose} ) or usage( 1 );
+usage( 2 ) unless @ARGV;
+
+=head2 Data Representation
+
+We store three hashes:
+
+=over
+
+=item 1 Filename hash C<< $DB->{f} >>
+
+Maps a filename to a dev, inode pair
+
+=item 2 File hash C<< $DB->{i} >>
+
+Maps a dev, inode pair to an SHA1 hash of the file's contents.
+
+=item 3 SHA1 hash C<< $DB->{h} >>
+
+Maps an SHA1 hash to the perceptual hash information for the file 
+
+=back
+
+=cut
+
+our $DB = get_db( DBFILE );
+END { put_db( DBFILE, $DB ) if defined $DB }
+
+fdmf( @ARGV );
+
+sub mention(@) {
+  print join( ' ', @_ ), "\n" if $Opt{verbose};
 }
 
-tie my %DB, 'GDBM_File', $db_file, &GDBM_WRCREAT | &GDBM_SYNC, 0640;
-# If your perl/GDBM can't do SYNC mode, comment the line above and use this:
-#tie my %DB, 'GDBM_File', $db_file, &GDBM_WRCREAT, 0640;
-
-# Recurse through the directory, searching for mp3s
-my @filelist = recurse_from_dir( $musicdir );
-
-# Compare that filelist to the already-cached files in the database.
-my @uncached = grep( ( not $DB{$_} ), @filelist );
-
-my $filecount = 0;
-
-print STDERR "Found ", $#filelist + 1, " files, ", $#uncached + 1,
- " uncached.\n";
-
-# this loop will add any uncached files to the database
-FILE: for my $file ( @uncached ) {
-  open( FILE, $file ) or die "Can't open $file: $!";
-  my $file_md5 = Digest::MD5->new->addfile( *FILE )->digest;
-  print STDERR $filecount++, "/", $#uncached, " waiting on $file\n";
-  # If an identical file is already indexed, reuse its summary.
-  for my $k ( keys %DB ) {
-    my $db_file_md5 = substr $DB{$k}, 100, 16;
-    if ( $file_md5 eq $db_file_md5 ) {
-      print STDERR "Identical files (using cached summary):\n";
-      print STDERR "\t$file\n\t\tAND\n\t$k\n";
-      my $cached_summary = substr $DB{$k}, 0, 96;
-      $DB{$file} = $cached_summary . base_hash( $file ) . $file_md5;
-      next FILE;
-    }
-  }
-  my $summary;
-  next FILE if sonic_reduce( $file, \$summary );
-  $DB{$file} = $summary . base_hash( $file ) . $file_md5;
-}    # post: %DB is complete
-
-untie %DB;
-
-#####################################################################
-########################## THE END ##################################
-#####################################################################
-
-sub base_hash {
-  substr md5( encode_utf8( basename( shift() ) ) ), 0, 4;
+sub fdmf {
+  my @obj = @_;
+  find {
+    wanted => sub {
+      return unless -f;
+      return if /^\./;
+      return unless can_handle( $_ );
+      process( $_ );
+    },
+    no_chdir => 1
+  }, @obj;
 }
 
-sub recurse_from_dir {
-  my ( $dir ) = @_;
-  my @filelist;
-  my $file_ptrn = '^[^.]';    # ignore dot files
+sub process {
+  my $file = File::Spec->rel2abs( $_[0] );
 
-  unless ( opendir( PARSEDIR, $dir ) ) {
-    printf STDERR "skipping $dir because $!\n";
-    return;
-  }
+  return if exists $DB->{f}{$file};
+  my $sig = file_sig( $file );
+  $DB->{f}{$file} = $sig;
 
-  for my $file ( sort( readdir( PARSEDIR ) ) ) {
-    my $fullname = $dir . "/" . $file;
-    $fullname =~ s/\/+/\//g;
-    if ( -d $fullname && $file !~ /^\..*/ ) {
-      push @filelist, recurse_from_dir( $fullname );
-    }
-    elsif ( $file =~ /$file_ptrn/i && -r $fullname ) {
-      $filelist[ ++$#filelist ] = $fullname;
-    }
-  }
-  closedir( PARSEDIR );
-  return @filelist;
+  return if exists $DB->{i}{$sig};
+  my $hash = file_sha1( $file );
+  $DB->{i}{$sig} = $hash;
+
+  return if exists $DB->{h}{$hash};
+  mention "Analysing $file";
+  $DB->{h}{$hash} = sonic_reduce( $file );
 }
 
 sub sonic_reduce {
-  # ARGUMENT: filename of music file
-  # RETURN by REFERENCE: 768-bit string for fdmf database
-  # RETURN VALUE: 0 for success, nonzero for nonsuccess.
-  my $f           = shift;
-  my $summary_ref = shift;
-  my @SR;
-  my @DECODE_CMD;
-  return -1 if decode_cmd( $f, \@DECODE_CMD );
+  my $f = shift;
 
-  pipe PIPE1_OUT, PIPE1_IN;
+  run(
+    (
+      $f =~ /~\.gz$/i
+      ? [ find_prog( 'gzip' ), '-d', $f ]
+      : [ find_prog( 'cat' ), $f ]
+    ),
+    '|',
+    [
+      find_prog( 'ffmpeg' ),
+      '-i', '-', '-acodec', 'pcm_s16le', '-f', 's16le', '-'
+    ],
+    '2>',
+    \( my $ffmpeg_err ),
+    '|',
+    [ find_prog( 'sonic_reducer', $FindBin::Bin ) ],
+    '>',
+    \( my $out )
+  );
 
-  my $pid1 = fork;
-  if ( $pid1 == 0 ) {    # we are child 1 (the decoder)
-    close( PIPE1_OUT ) or die "$!";
-    open( STDOUT, ">&PIPE1_IN" ) or die "$!";
-    open( STDERR, ">cmd.log" )   or die "$!";
-    exec @DECODE_CMD or die "$!";
-  }
-  else {    # we are still the parent (having had one child of two)
-    close( PIPE1_IN ) or die;    # child 1 will write on this
-    pipe PIPE2_OUT, PIPE2_IN;
-    my $pid2 = fork;
-    if ( $pid2 == 0 ) {    # we are child 2 (the sonic_reducer process)
-      close( PIPE2_OUT ) or die "$!";
-      open( STDIN,  "<&PIPE1_OUT" ) or die "$!";
-      open( STDOUT, ">&PIPE2_IN" )  or die "$!";
-      exec $SONICREDUCER or die "$!";
-    }
-    else {    # we are still the parent (having had both children)
-      close( PIPE2_IN ) or die "$!";
-      @SR = <PIPE2_OUT>;
-    }
-    waitpid $pid1, 0;
-    waitpid $pid2, 0;
-  }
+  chomp $out;
+  my @data = split /\n/, $out;
+  die "sonic_reducer produced strange results\n"
+   unless @data == 768;
 
-  if ( $#SR != 767 ) {
-    print STDERR
-     "sonic_reducer had trouble with $f.  Corrupt audio file?\n";
-    return -2;
-  }
-  my @e = @SR[ 0 .. 255 ];     # energy spectrum summary
-  my @r = @SR[ 256 .. 511 ];   # ratio (high/low) spectrum summary
-  my @t = @SR[ 512 .. 767 ];   # twist (odd/even ratio) spectrum summary
-  my $j = join( "", quantize( @e ), quantize( @r ), quantize( @t ) );
-  $$summary_ref = pack( "b*", $j );
-  return 0;
+  return unpack 'H*', pack 'b*',
+   join '', quantize( @data[ 0 .. 255 ] ),
+   quantize( @data[ 256 .. 511 ] ),
+   quantize( @data[ 512 .. 767 ] );
 }
 
-sub decode_cmd {
-  # This routine looks at the filename extension of a music file.
-  # It returns the shell command for decoding it.
-  # These also work, if you don't want to use mplayer:
-  #	@$cmd_ref = ("mpg123", "-s", "-q", $f);
-  #	@$cmd_ref = ("ogg123", "-d", "raw", "-f", "-", $f);
-  my $f       = shift;
-  my $cmd_ref = shift;
-
-  if ( $f =~ /\.(?:mp3|ogg|m4a|wma|wav|ra|aiff)$/i ) {
-    @$cmd_ref
-     = ( 'ffmpeg', '-i', $f, '-acodec', 'pcm_s16le', '-f', 's16le',
-      '-' );
-    return 0;
-  }
-
-  print STDERR
-   "Filename $f doesn't have an extension that we handle.\n";
-  return -1;
+sub file_sig {
+  my $file = shift;
+  my @st = stat $file or die "Can't stat $file: $!\n";
+  return join '-', @st[ 0, 1 ];
 }
 
-sub find_sr {
-  my $sr_path;
-  $sr_path
-   = dirname( $0 ) . "/sonic_reducer";    # look in same dir as fdmf
-  return $sr_path if -x $sr_path;
-  $sr_path
-   = getcwd() . "/sonic_reducer";    # look in the current directory
-  return $sr_path if -x $sr_path;
-  return 0;                          # we failed to find sonic_reducer
+sub file_sha1 {
+  my $file = shift;
+  open my $fh, '<', $file or die "Can't read $file: $!\n";
+  return Digest::SHA1->new->addfile( $fh )->hexdigest;
+}
+
+sub can_handle {
+  my $f = shift;
+  return 1 if $f =~ /\.(?:mp3|ogg|m4a|wma|wav|ra|aiff)(?:\.gz)?$/i;
+  return;
 }
 
 sub quantize {
-  # one bit quantize with median value as threshold
-  my @s;
   my $median = median( @_ );
-  for my $i ( 0 .. $#_ ) {
-    $s[$i] = ( $_[$i] > $median ) ? 1 : 0;
-  }
-  return @s;
+  return map { $_ > $median ? 1 : 0 } @_;
 }
 
 sub median {
-  my $size;
-  my $median;
   my @sorted = sort { $a <=> $b } @_;
-  $size = scalar @sorted;
-  if ( $size % 2 ) {
-    $median = $sorted[ ( $size - 1 ) / 2 ];
+  return $sorted[ @sorted / 2 ];
+}
+
+sub get_db {
+  my $db = shift;
+  return retrieve $db if -e $db;
+  return {};
+}
+
+sub put_db {
+  my ( $db, $data ) = @_;
+  if ( -e $db ) {
+    my $bak = "$db.old";
+    rename $db, $bak or die "Can't rename $db as $bak: $!\n";
   }
-  else {
-    $median
-     = ( $sorted[ $size / 2 ] + $sorted[ ( $size / 2 ) - 1 ] ) / 2;
+  store $data, $db;
+}
+
+sub usage {
+  my $rc = shift;
+  print STDERR "Usage: fdmf dir...\n";
+  exit $rc if defined $rc;
+}
+
+sub find_prog {
+  my ( $name, @path ) = @_;
+  for my $p ( @path ) {
+    my $try = File::Spec->catfile( $p, $name );
+    return $try if -x $try;
   }
+  my $bin = which( $name );
+  die "Can't find $name on PATH\n" unless defined $bin;
+  return $bin;
 }
 
 # vim:ts=2:sw=2:sts=2:et:ft=perl
