@@ -162,10 +162,23 @@ new_correlation( size_t nent ) {
 }
 
 static void
+show_correlation( const struct correlation *c, size_t nused ) {
+  unsigned i;
+  for ( i = 0; i < nused; i++ ) {
+    printf( "%5u ", c[i].distance );
+    hexdump( c[i].pair[0]->bits, HASH_BYTES );
+    printf( " " );
+    hexdump( c[i].pair[1]->bits, HASH_BYTES );
+    printf( "\n" );
+  }
+}
+
+static void
 sanity_check( const struct correlation *c, size_t nused ) {
   unsigned i;
   for ( i = 1; i < nused; i++ ) {
     if ( c[i - 1].distance > c[i].distance ) {
+      show_correlation( c, nused );
       die( "distance out of order at %u\n", i );
     }
   }
@@ -182,9 +195,27 @@ insert_correlation( struct correlation *c, size_t nent, size_t * nused,
     if ( c[mid].distance < distance ) {
       lo = mid + 1;
     }
-    else if ( c[mid].distance > distance ) {
+    else if ( c[mid].distance >= distance ) {
       hi = mid;
     }
+  }
+
+  {
+    unsigned lmid = mid;
+
+    while ( mid > 0 && c[mid].distance > distance ) {
+      mid--;
+    }
+    while ( mid < *nused && c[mid].distance < distance ) {
+      mid++;
+    }
+
+#if 0
+    if ( lmid != mid ) {
+      printf( "\nBefore adjust mid=%u\n", lmid );
+      printf( "After adjust mid=%u\n", mid );
+    }
+#endif
   }
 
   nnew = MIN( nent, *nused + 1 );
@@ -238,6 +269,7 @@ correlate( const struct phash *data, size_t nent, size_t * nused ) {
   for ( pi = data; pi; pi = pi->next ) {
     for ( pj = pi->next; pj; pj = pj->next ) {
       /* don't know if this summary stuff is worth the bother */
+      printf( "." );
       if ( *nused == nent
            && best_distance( pi, pj ) >= c[*nused - 1].distance ) {
         continue;
@@ -248,6 +280,7 @@ correlate( const struct phash *data, size_t nent, size_t * nused ) {
       }
     }
   }
+  printf( "\n" );
   return c;
 }
 
@@ -255,8 +288,7 @@ int
 main( int argc, char *argv[] ) {
   struct phash *data;
   struct correlation *c;
-  size_t nent = 100, nused;
-  unsigned i;
+  size_t nent = 1000, nused;
 
   if ( argc < 2 ) {
     data = read_file( stdin );
@@ -272,13 +304,7 @@ main( int argc, char *argv[] ) {
 
   dump_phash( data );
   c = correlate( data, nent, &nused );
-  for ( i = 0; i < nused; i++ ) {
-    printf( "%5u ", c[i].distance );
-    hexdump( c[i].pair[0]->bits, HASH_BYTES );
-    printf( " " );
-    hexdump( c[i].pair[1]->bits, HASH_BYTES );
-    printf( "\n" );
-  }
+  show_correlation( c, nused );
   free_phash( data );
 
   return 0;
