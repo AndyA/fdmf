@@ -193,29 +193,11 @@ insert_correlation( struct correlation *c, size_t nent, size_t * nused,
   for ( lo = 0, hi = *nused; lo < hi; ) {
     mid = ( lo + hi ) / 2;
     if ( c[mid].distance < distance ) {
-      lo = mid + 1;
+      lo = ++mid;
     }
     else if ( c[mid].distance >= distance ) {
       hi = mid;
     }
-  }
-
-  {
-    unsigned lmid = mid;
-
-    while ( mid > 0 && c[mid].distance > distance ) {
-      mid--;
-    }
-    while ( mid < *nused && c[mid].distance < distance ) {
-      mid++;
-    }
-
-#if 0
-    if ( lmid != mid ) {
-      printf( "\nBefore adjust mid=%u\n", lmid );
-      printf( "After adjust mid=%u\n", mid );
-    }
-#endif
   }
 
   nnew = MIN( nent, *nused + 1 );
