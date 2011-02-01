@@ -7,7 +7,6 @@
 use strict;
 use warnings;
 
-use Cwd;
 use Digest::SHA1 qw( sha1 );
 use File::Basename;
 use File::Find;
