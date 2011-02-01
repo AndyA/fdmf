@@ -5,12 +5,14 @@
  */
 
 #include <ctype.h>
+#include <getopt.h>
 #include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#define PROG "correlator"
 #define HASH_LEN 768
 #define HASH_BYTES (HASH_LEN / 8)
 #define HASH_CHARS (HASH_LEN / 4)
@@ -29,6 +31,19 @@ struct correlation {
   const struct phash *pair[2];
   unsigned int distance;
 };
+
+static int verbose = 0;
+
+static void
+mention( const char *msg, ... ) {
+  va_list ap;
+  if ( verbose ) {
+    va_start( ap, msg );
+    vfprintf( stderr, msg, ap );
+    fprintf( stderr, "\n" );
+    va_end( ap );
+  }
+}
 
 static void
 die( const char *msg, ... ) {
@@ -135,19 +150,6 @@ hexdump( const unsigned char *data, size_t len ) {
   }
 }
 
-static void
-dump_phash( const struct phash *ph ) {
-  int i;
-  while ( ph ) {
-    hexdump( ph->bits, HASH_BYTES );
-    for ( i = 0; i < SUMMARY_LEN; i++ ) {
-      printf( " %3d", ph->summary[i] );
-    }
-    printf( "\n" );
-    ph = ph->next;
-  }
-}
-
 static struct correlation *
 new_correlation( size_t nent ) {
   struct correlation *c;
@@ -173,6 +175,7 @@ show_correlation( const struct correlation *c, size_t nused ) {
   }
 }
 
+#ifdef DEBUG
 static void
 sanity_check( const struct correlation *c, size_t nused ) {
   unsigned i;
@@ -183,6 +186,21 @@ sanity_check( const struct correlation *c, size_t nused ) {
     }
   }
 }
+
+static void
+dump_phash( const struct phash *ph ) {
+  int i;
+  while ( ph ) {
+    hexdump( ph->bits, HASH_BYTES );
+    for ( i = 0; i < SUMMARY_LEN; i++ ) {
+      printf( " %3d", ph->summary[i] );
+    }
+    printf( "\n" );
+    ph = ph->next;
+  }
+}
+
+#endif
 
 static void
 insert_correlation( struct correlation *c, size_t nent, size_t * nused,
@@ -206,7 +224,10 @@ insert_correlation( struct correlation *c, size_t nent, size_t * nused,
   c[mid].pair[1] = that;
   c[mid].distance = distance;
   *nused = nnew;
+
+#ifdef DEBUG
   sanity_check( c, *nused );
+#endif
 }
 
 static void
@@ -249,12 +270,12 @@ correlate( const struct phash *data, size_t nent, size_t * nused ) {
 
   /* O(N^2) :) */
   for ( pi = data; pi; pi = pi->next ) {
+    if ( verbose )
+      fprintf( stderr, "." );
     for ( pj = pi->next; pj; pj = pj->next ) {
       /* don't know if this summary stuff is worth the bother */
-      fprintf( stderr, "." );
       if ( *nused == nent
            && best_distance( pi, pj ) >= c[*nused - 1].distance ) {
-        fprintf( stderr, "*" );
         continue;
       }
       distance = hash_distance( pi, pj, bitcount );
@@ -263,8 +284,19 @@ correlate( const struct phash *data, size_t nent, size_t * nused ) {
       }
     }
   }
-  fprintf( stderr, "\n" );
+  if ( verbose )
+    fprintf( stderr, "\n" );
   return c;
+}
+
+static void
+usage( void ) {
+  fprintf( stderr, "Usage: " PROG " [options] < dump\n\n"
+           "Options:\n"
+           "  -K, --keep    <N> Number of matches to keep (default 1000)\n"
+           "  -v, --verbose     Verbose output\n"
+           "  -h, --help        See this text\n" );
+  exit( 1 );
 }
 
 int
@@ -272,20 +304,61 @@ main( int argc, char *argv[] ) {
   struct phash *data;
   struct correlation *c;
   size_t nent = 1000, nused;
+  int ch;
 
-  if ( argc < 2 ) {
-    data = read_file( stdin );
+  static struct option opts[] = {
+    {"help", no_argument, NULL, 'h'},
+    {"verbose", no_argument, NULL, 'v'},
+    {"keep", required_argument, NULL, 'K'},
+    {NULL, 0, NULL, 0}
+  };
+
+  while ( ch = getopt_long( argc, argv, "ahvVF:", opts, NULL ), ch != -1 ) {
+    switch ( ch ) {
+    case 'v':
+      verbose++;
+      break;
+    case 'K':
+      {
+        char *ep;
+        nent = strtod( optarg, &ep );
+        if ( *ep ) {
+          die( "Bad number" );
+        }
+      }
+      break;
+    case 'h':
+    default:
+      usage(  );
+    }
   }
-  else {
+
+  argc -= optind;
+  argv += optind;
+
+  if ( argc > 2 ) {
+    usage(  );
+    return 0;                   /* not reached, silence warning */
+  }
+  else if ( argc > 1 ) {
     FILE *fl = fopen( argv[1], "r" );
     if ( !fl ) {
       die( "Can't read %s", argv[1] );
     }
+    mention( "Reading %s", argv[1] );
     data = read_file( fl );
     fclose( fl );
   }
+  else {
+    data = read_file( stdin );
+  }
 
-/*  dump_phash( data );*/
+  mention( "Looking for %lu collisions", ( unsigned long ) nent );
+
+#ifdef DEBUG
+  dump_phash( data );
+#endif
+
   c = correlate( data, nent, &nused );
   show_correlation( c, nused );
   free_phash( data );

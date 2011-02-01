@@ -28,7 +28,7 @@ memoize qw( find_prog );
 find_prog( 'spline' );
 
 GetOptions( 'verbose' => \$Opt{verbose} ) or usage( 1 );
-usage( 2 ) unless @ARGV;
+@ARGV = '.' unless @ARGV;
 
 =head2 Data Representation
 
