@@ -3,6 +3,7 @@
 Session.vim
 cmd.log
 dump
+dups
 fdmf_correlator
 fdmf_sonic_reducer
 fdmf_vector_pairs
