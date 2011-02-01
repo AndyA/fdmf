@@ -15,10 +15,10 @@
 #include <string.h>
 
 #define BYTES_PER_STEREO_SAMPLE 4
-#define BYTES_PER_MONO_SAMP 2 
+#define BYTES_PER_MONO_SAMP 2
 
-void write_to_fd(int fd, char *buf, int size);
-int read_from_fd(int fd, char *buf, int size);
-void pad(int bufbytes, char *buf, int byte_count); 
+void write_to_fd( int fd, char *buf, int size );
+int read_from_fd( int fd, char *buf, int size );
+void pad( int bufbytes, char *buf, int byte_count );
 
-#endif /* !_COMMON_H */
+#endif                          /* !_COMMON_H */

@@ -21,23 +21,24 @@ MA 02111-1307, USA.
 
 /* Modfied by Kurt Rosenfeld 2004 */
 
-float compare (char *s1, char *s2) {
+float
+compare( char *s1, char *s2 ) {
   int i, j, k, x, y;
   float n = 0;
-  
-  for (i=0; s1[i]; i++) {
+
+  for ( i = 0; s1[i]; i++ ) {
     x = i;
-    for (j=0; s2[j]; j++) {
+    for ( j = 0; s2[j]; j++ ) {
       y = j;
       k = 0;
-      while ((s1[x] && s2[y]) && (s1[x] == s2[y])) {
-		k++;
-		n += (float)(k*k)/4;
-		x++;
-		y++;
+      while ( ( s1[x] && s2[y] ) && ( s1[x] == s2[y] ) ) {
+        k++;
+        n += ( float ) ( k * k ) / 4;
+        x++;
+        y++;
       }
     }
   }
-  n /= strlen (s1) * strlen (s2);
+  n /= strlen( s1 ) * strlen( s2 );
   return n;
 }
