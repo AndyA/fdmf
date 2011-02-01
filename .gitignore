@@ -2,7 +2,9 @@
 .*.swp
 Session.vim
 cmd.log
+dump
 fdmf_correlator
 fdmf_sonic_reducer
-tags
 fdmf_vector_pairs
+report
+tags
