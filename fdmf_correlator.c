@@ -356,7 +356,7 @@ main( int argc, char *argv[] ) {
     {NULL, 0, NULL, 0}
   };
 
-  while ( ch = getopt_long( argc, argv, "ahvVF:", opts, NULL ), ch != -1 ) {
+  while ( ch = getopt_long( argc, argv, "hvK:", opts, NULL ), ch != -1 ) {
     switch ( ch ) {
     case 'v':
       verbose++;
@@ -379,16 +379,16 @@ main( int argc, char *argv[] ) {
   argc -= optind;
   argv += optind;
 
-  if ( argc > 2 ) {
+  if ( argc > 1 ) {
     usage(  );
     return 0;                   /* not reached, silence warning */
   }
-  else if ( argc > 1 ) {
-    FILE *fl = fopen( argv[1], "r" );
+  else if ( argc > 0 ) {
+    FILE *fl = fopen( argv[0], "r" );
     if ( !fl ) {
-      die( "Can't read %s", argv[1] );
+      die( "Can't read %s", argv[0] );
     }
-    mention( "Reading %s", argv[1] );
+    mention( "Reading %s", argv[0] );
     data = read_file( fl, &count );
     fclose( fl );
   }
