@@ -10,10 +10,18 @@ use constant DBFILE => glob '~/.fdmf';
 
 my %Opt = ( verbose => 0 );
 
+my %Desc = (
+  f => 'file',
+  i => 'inode',
+  h => 'phash',
+);
+
 GetOptions( 'verbose' => \$Opt{verbose} ) or usage( 1 );
 
 our $DB = get_db( DBFILE );
 END { put_db( DBFILE, $DB ) if defined $DB }
+
+my %before = stats( $DB );
 
 chomp( my @files = <> );
 delete @{ $DB->{f} }{@files};
@@ -21,6 +29,20 @@ delete @{ $DB->{f} }{@files};
 # garbage collect
 gc( $DB->{i}, $DB->{f} );
 gc( $DB->{h}, $DB->{i} );
+
+my %after = stats( $DB );
+
+if ( $Opt{verbose} ) {
+  for my $k ( 'f', 'i', 'h' ) {
+    printf "%-5s : %10d --> %10d (%10d)\n", $Desc{$k}, $before{$k},
+     $after{$k}, $before{$k} - $after{$k};
+  }
+}
+
+sub stats {
+  my $db = shift;
+  return map { $_ => scalar( keys %{ $db->{$_} } ) } keys %$db;
+}
 
 sub gc {
   my ( $hash, $ref ) = @_;
