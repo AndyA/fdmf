@@ -284,7 +284,7 @@ progress( unsigned long done, unsigned long total, size_t used,
   static char *spinner = "-\\|/";
   if ( pc != *lastpc || used / 100 != *lastused / 100
        || ( used == size && *lastused != size ) ) {
-    fprintf( stderr, "\r[%3u%%] %c hits: %10lu / %10lu", pc / 4,
+    fprintf( stderr, "\r[%3u%%] %c correlations: %10lu / %10lu", pc / 4,
              spinner[pc % 4], ( unsigned long ) used,
              ( unsigned long ) size );
     fflush( stderr );
@@ -396,7 +396,7 @@ main( int argc, char *argv[] ) {
     data = read_file( stdin, &count );
   }
 
-  mention( "Looking for %lu duplicates in %lu files",
+  mention( "Looking for %lu correlations in %lu files",
            ( unsigned long ) nent, ( unsigned long ) count );
 
 #ifdef DEBUG
