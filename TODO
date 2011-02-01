@@ -1,0 +1,3 @@
+The global ~/.fdmf database is silly; it shouldn't even be a default.
+Change everything that assumes it to take an explicit database name.
+
