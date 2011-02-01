@@ -8,7 +8,9 @@ use Storable;
 use constant DBFILE => glob '~/.fdmf';
 
 die "No ", DBFILE, "\n" unless -e DBFILE;
-my $db = retrieve DBFILE;
-print "$_\n" for sort grep defined, values %{ $db->{h} };
+my $db   = retrieve DBFILE;
+my %seen = ();
+print "$_\n"
+ for sort grep { defined && !$seen{$_}++ } values %{ $db->{h} };
 
 # vim:ts=2:sw=2:sts=2:et:ft=perl
