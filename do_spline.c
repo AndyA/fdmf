@@ -1,4 +1,4 @@
-#include "sonic_reducer.h"
+#include "fdmf_sonic_reducer.h"
 
 void do_spline(fftw_complex *spline_in, int c) {	
 	FILE *spline;

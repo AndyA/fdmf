@@ -13,7 +13,7 @@ found.  This allows you to leave your ~/.fdmf database alone and let it grow.
 Old deleted "ghost" files in the database will not be considered matches, but
 these records are useful to keep because if an identical file is encountered 
 later with a different name, the cached summary will be used, which is a huge 
-speedup.  This feature can be disabled in vector_pairs.h for special uses.
+speedup.  This feature can be disabled in fdmf_vector_pairs.h for special uses.
 
 0.0.9o (unreleased stupid experiment)
 

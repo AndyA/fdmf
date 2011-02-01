@@ -1,5 +1,5 @@
 
-#include "vector_pairs.h"
+#include "fdmf_vector_pairs.h"
 
 int prescan_db(GDBM_FILE mdb) {
 	/* walk through the whole database */

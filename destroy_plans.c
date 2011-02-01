@@ -1,4 +1,4 @@
-#include "sonic_reducer.h"
+#include "fdmf_sonic_reducer.h"
 
 
 void destroy_plans(fftw_plan ep, fftw_plan rp, fftw_plan tp) {

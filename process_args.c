@@ -1,4 +1,4 @@
-#include "vector_pairs.h"
+#include "fdmf_vector_pairs.h"
 /* This code is a mess.  It would be nice to rewrite this.  */
 
 int process_args(int argc, char ** argv, int *threshold, char *out_delim) {

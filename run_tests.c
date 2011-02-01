@@ -1,4 +1,4 @@
-#include "vector_pairs.h"
+#include "fdmf_vector_pairs.h"
 
 int run_tests(char *dblk, int *hashes, char **names, 
 				int vecs, int *thres, char delim) {

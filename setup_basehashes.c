@@ -1,4 +1,4 @@
-#include "vector_pairs.h"
+#include "fdmf_vector_pairs.h"
 
 int setup_basehashes(int **basehashes_ptr, int num_vecs) {
 	*basehashes_ptr = malloc(BASE_HASH_LEN * num_vecs);

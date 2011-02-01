@@ -1,4 +1,4 @@
-#include "vector_pairs.h"
+#include "fdmf_vector_pairs.h"
 
 int load_datablock(GDBM_FILE kdb, char *dblk, char **filenames, int *bhashes) {
 /* Load datablock with vectors */

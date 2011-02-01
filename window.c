@@ -1,4 +1,4 @@
-#include "sonic_reducer.h"
+#include "fdmf_sonic_reducer.h"
 
 /*
 This routing operates destructively on the 

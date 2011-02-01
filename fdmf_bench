@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# This script is for tuning vector_pairs parameters.
+# This script is for tuning fdmf_vector_pairs parameters.
 # See the README file.
 use strict;
 die "$0 usage: <p1_ctr> <p2_ctr> <p3_ctr> <delta> <inc>" unless $#ARGV == 4;
@@ -21,8 +21,8 @@ for (my $p1 = $p1_start; $p1 <= $p1_stop; $p1+= $inc) {
 	for (my $p2 = $p2_start; $p2 <= $p2_stop; $p2 += $inc) {
 	print STDERR "i=$p1\tj=$p2\n";
 		for (my $p3 = $p3_start; $p3 <= $p3_stop; $p3 += $inc) {
-			my $result = `./vector_pairs $p1 $p2 $p3 2>&1 > /dev/null`;
-			die "bad vector_pairs" if $?;
+			my $result = `./fdmf_vector_pairs $p1 $p2 $p3 2>&1 > /dev/null`;
+			die "bad fdmf_vector_pairs" if $?;
 			chomp($result);
 			my @r = split(/\s/, $result);
 			print GPD join("\t",$r[0],$r[1],$r[2],$r[3]+$r[4],$r[3],$r[4]),"\n";

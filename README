@@ -12,14 +12,14 @@ different or nonexistent metainformation such as ID3 tags.
 USAGE: 
 
 	fdmf <music_dir>     
-	vector_pairs
+	fdmf_vector_pairs
 
 USAGE EXAMPLE:
 
 	./fdmf /home/bob/music/
-	./vector_pairs
+	./fdmf_vector_pairs
 
-vector_pairs will print on stdout a list of pairs of files that may
+fdmf_vector_pairs will print on stdout a list of pairs of files that may
 contain the same music.  
 
 NOTE: The first time you run this program it will do a lot of processing.  
@@ -39,8 +39,8 @@ some measurements on your system to see which decoder is fastest.
 TUNING:
 
 There are important threshold parameters that affect the 
-the detection of similar files by vector_pairs.  If you don't
-give vector_pairs any command line arguments, then it will use
+the detection of similar files by fdmf_vector_pairs.  If you don't
+give fdmf_vector_pairs any command line arguments, then it will use
 the default parameters, which should hopefully work OK.  Or you
 can tune these parameters to improve the performance.  
 
@@ -79,7 +79,7 @@ from the existing index entry to the new index entry.  This skips steps
 magnitude.  In the worst case (no identical files) this slows things down
 by about 1%.
 
-After finding that two files in the database seem to match, vector_pairs
+After finding that two files in the database seem to match, fdmf_vector_pairs
 checks to make sure that both files exist.  If they don't exist, it will
 suppress the output regarding that pair.  The goal of this is to only
 print messages about actual duplicate files, but to keep the records for
@@ -89,7 +89,7 @@ that it already has.  The summaries are small, so for most people,
 it is worth it to cache these "ghost" records.
 
 Steps 1 through 6.5 are implemented in fdmf.
-Steps 7 and 8 are implemented in vector_pairs in C.
+Steps 7 and 8 are implemented in fdmf_vector_pairs in C.
 ################################################
 
 DEVELOPMENT GOALS:
@@ -109,13 +109,13 @@ output a raw stream should be easy to support.
 It would be really good to have a GNU configure script.  If somebody
 wants to write one, that would be great.
 
-The FFTW fourier transform library that sonic_reducer  uses has 
+The FFTW fourier transform library that fdmf_sonic_reducer  uses has 
 a "plan" structure that controls how the FFT will be performed.  
 It is possible to cache this plan from one invocation to the next in 
 a file.  This might speed things up.  But currently about 90% of the 
 CPU time required to index music files is the time it takes to decode 
 the music file (mpg123, for example), it is questionable whether it
-is worth worrying about optimizing sonic_reducer.  It might be more 
+is worth worrying about optimizing fdmf_sonic_reducer.  It might be more 
 beneficial to see whether there is something that can be done to speed 
 up the decoding.  Skipping frames in the decoding is possible in mpg123,
 but in my early testing it seemed to increase the number of classification
@@ -129,14 +129,14 @@ KNOWN BUGS:
 HACKING:
 
 If you want to hack around, you might find useful the stderr output
-of vector_pairs.  It is four numbers in the following format:
+of fdmf_vector_pairs.  It is four numbers in the following format:
 
 <THRESH 0> <THRESH 1> <THRESH 2> <NUM TYPE1 ERRS> <NUM TYPE2 ERRS>
 
 This can be used to print out the number of classification
 errors that the program is making.  It will tell you how many times 
-vector_pairs said that the pair of files contained the same music when 
-they really didn't, and how many times vector_pairs said that the pair 
+fdmf_vector_pairs said that the pair of files contained the same music when 
+they really didn't, and how many times fdmf_vector_pairs said that the pair 
 of files did not contain the same music when they actually do.  For 
 the program to do this, you must give it a big hint in the naming 
 of the files.  It looks at the basenames.
@@ -153,7 +153,7 @@ when you play them.  A shell command for recoding is
 
 	mpg123 -s foo.mp3 | bladeenc STDIN new_dir/foo.mp3
 
-When vector_pairs runs, it checks to see whether the basenames of the 
+When fdmf_vector_pairs runs, it checks to see whether the basenames of the 
 filenames are the same.  If the classification algorithm judged the contents 
 to be different but the files have the same basename, it increments the 
 type2 error counter.  If the classification algorithm judged them to have
@@ -171,7 +171,7 @@ in the representation of the music will make the tests more meaningful.
 FDMF_BENCH:
 
 A little script called fdmf_bench is included in the fdmf tarball.  It will 
-run vector_pairs over a range of parameter values.  It will output a file
+run fdmf_vector_pairs over a range of parameter values.  It will output a file
 called gpd.  gpd output line format:
 
 <p1>	<p2>	<p3>	<t1 + t2>	<t1>	<t2>
@@ -190,20 +190,20 @@ OPTPARAMS:
 Another little script is included that uses fdmf_bench to search the 
 entire parameter space.  It is useful for finding reasonable parameters
 in a reasonable amount of time.  Usually this isn't necessary because 
-the default parameters defined in vector_pairs.h should be OK, but when
-somebody makes a change to the sonic_reducer algorithm, it is necessary 
+the default parameters defined in fdmf_vector_pairs.h should be OK, but when
+somebody makes a change to the fdmf_sonic_reducer algorithm, it is necessary 
 to find new parameter values.
 
 AUTOMATIC DUPLICATE HANDLING (cleanup_dups):
 
-The vector_pairs program takes and optional -0 (that's a zero) argument.
+The fdmf_vector_pairs program takes and optional -0 (that's a zero) argument.
 This has the same purpose as the -print0 option for the UNIX find program.
 It causes the output of the program to be delimited by null bytes instead 
 of the usual human readable delimiters, tab and newline.  This way, the
 output can be fed to another program and the other program can unambiguously
 parse the stream into separate filenames. 
 
-With the -0 option, the output of vector_pairs can be piped to another 
+With the -0 option, the output of fdmf_vector_pairs can be piped to another 
 program which takes in the list of matching pairs of music files and
 takes some action.  All kinds of logic can be employed to decide what 
 to do.  Maybe you want to move duplicate files to some other place.  

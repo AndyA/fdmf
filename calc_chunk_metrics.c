@@ -1,4 +1,4 @@
-#include "sonic_reducer.h"
+#include "fdmf_sonic_reducer.h"
 /*
 This routine reads STDIN until it gets to the end.  The stream is broken
 into chunks and each chunk is fourier transformed.  Some metrics are 

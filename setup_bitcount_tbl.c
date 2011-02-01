@@ -1,4 +1,4 @@
-#include "vector_pairs.h"
+#include "fdmf_vector_pairs.h"
 
 int setup_bitcount_tbl(int *tbl) {
 	/* initalize lookup table */

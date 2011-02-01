@@ -1,4 +1,4 @@
-#include "sonic_reducer.h"
+#include "fdmf_sonic_reducer.h"
 
 void setup_plans(int c, f_p *ep, f_p *rp, f_p *tp, 
 	f_c * ebuf, f_c * rbuf, f_c * tbuf, 

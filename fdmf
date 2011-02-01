@@ -107,7 +107,8 @@ sub sonic_reduce {
     '-i', $ff, '-acodec', 'pcm_s16le', '-f', 's16le', '-'
    ],
    '2>', \( my $ffmpeg_err ), '|',
-   [ find_prog( 'sonic_reducer', $FindBin::Bin ) ], '>', \( my $out );
+   [ find_prog( 'fdmf_sonic_reducer', $FindBin::Bin ) ], '>',
+   \( my $out );
 
   run @pipe;
 
@@ -115,8 +116,8 @@ sub sonic_reduce {
   my @data = split /\n/, $out;
   unless ( @data == 768 ) {
     print STDERR "ffmpeg error output:\n$ffmpeg_err\n\n",
-     "sonic_reducer output:\n$out\n\n";
-    die "sonic_reducer produced strange results\n";
+     "fdmf_sonic_reducer output:\n$out\n\n";
+    die "fdmf_sonic_reducer produced strange results\n";
   }
 
   return unpack 'H*', pack 'b*',

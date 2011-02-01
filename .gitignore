@@ -3,6 +3,6 @@
 Session.vim
 cmd.log
 fdmf_correlator
-sonic_reducer
+fdmf_sonic_reducer
 tags
-vector_pairs
+fdmf_vector_pairs

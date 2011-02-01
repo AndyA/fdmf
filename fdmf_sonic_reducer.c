@@ -1,4 +1,4 @@
-#include "sonic_reducer.h"
+#include "fdmf_sonic_reducer.h"
 /*
 This program reads raw 16-bit stereo native endian audio data on
 STDIN and writes to STDOUT the power spectra of the chunk metrics.

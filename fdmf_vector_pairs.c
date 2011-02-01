@@ -1,7 +1,7 @@
 /* Kurt Rosenfeld 2004 */
 /* GPL */
 
-#include "vector_pairs.h"
+#include "fdmf_vector_pairs.h"
 
 int main(int argc, char **argv) {
 	int num_vecs, *basehashes, threshold[] = {DFL_THRESH};

@@ -1,4 +1,4 @@
-#include "sonic_reducer.h"
+#include "fdmf_sonic_reducer.h"
 
 void setup_bufs(fftw_complex **ebuf, fftw_complex **eout, fftw_complex **rbuf, 
 			fftw_complex **rout, fftw_complex **tbuf, fftw_complex **tout) {

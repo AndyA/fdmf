@@ -1,4 +1,4 @@
-#include "vector_pairs.h"
+#include "fdmf_vector_pairs.h"
 
 GDBM_FILE setup_db(int *num_vecs) {
 	GDBM_FILE db;
