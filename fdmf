@@ -1,6 +1,8 @@
 #!/usr/bin/env perl
 # Kurt Rosenfeld 2004, 2005, 2006
 # GPL
+#
+# This version by Andy Armstrong, andy@hexten.net, 2011
 
 use strict;
 use warnings;
