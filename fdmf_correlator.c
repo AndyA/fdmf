@@ -1,4 +1,4 @@
-/* correlator.c 
+/* fdmf_correlator.c 
  *
  * Read a list of phashes and for each input hash display its closest
  * neighbours
@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PROG "correlator"
+#define PROG "fdmf_correlator"
 #define HASH_LEN 768
 #define HASH_BYTES (HASH_LEN / 8)
 #define HASH_CHARS (HASH_LEN / 4)
