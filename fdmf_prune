@@ -1,0 +1,57 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+use Getopt::Long;
+use Storable;
+
+use constant DBFILE => glob '~/.fdmf';
+
+my %Opt = ( verbose => 0 );
+
+GetOptions( 'verbose' => \$Opt{verbose} ) or usage( 1 );
+
+our $DB = get_db( DBFILE );
+END { put_db( DBFILE, $DB ) if defined $DB }
+
+chomp( my @files = <> );
+delete @{ $DB->{f} }{@files};
+
+# garbage collect
+gc( $DB->{i}, $DB->{f} );
+gc( $DB->{h}, $DB->{i} );
+
+sub gc {
+  my ( $hash, $ref ) = @_;
+  my %hashused = map { $_ => 0 } keys %$hash;
+  $hashused{$_}++ for values %$ref;
+  delete @{$hash}{ grep !$hashused{$_}, keys %hashused };
+}
+
+sub mention(@) {
+  print join( ' ', @_ ), "\n" if $Opt{verbose};
+}
+
+sub get_db {
+  my $db = shift;
+  return retrieve $db if -e $db;
+  return {};
+}
+
+sub put_db {
+  my ( $db, $data ) = @_;
+  if ( -e $db ) {
+    my $bak = "$db.old";
+    rename $db, $bak or die "Can't rename $db as $bak: $!\n";
+  }
+  store $data, $db;
+}
+
+sub usage {
+  my $rc = shift;
+  print STDERR "Usage: fdmf_prune < filenames\n";
+  exit $rc if defined $rc;
+}
+
+# vim:ts=2:sw=2:sts=2:et:ft=perl
