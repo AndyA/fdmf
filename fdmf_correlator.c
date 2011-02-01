@@ -121,13 +121,16 @@ new_phash( unsigned char *hash, struct phash *next ) {
 }
 
 static struct phash *
-read_file( FILE * fl ) {
+read_file( FILE * fl, size_t * count ) {
   struct phash *data = NULL;
   unsigned char hash[HASH_BYTES];
   for ( ;; ) {
     if ( !read_hash( fl, hash ) )
       break;
     data = new_phash( hash, data );
+    if ( count ) {
+      ( *count )++;
+    }
   }
   return data;
 }
@@ -281,8 +284,9 @@ progress( unsigned long done, unsigned long total, size_t used,
   static char *spinner = "-\\|/";
   if ( pc != *lastpc || used / 100 != *lastused / 100
        || ( used == size && *lastused != size ) ) {
-    fprintf( stderr, "\r[%3u%%] %c hits: %10lu / %10lu", pc / 4, spinner[pc % 4],
-             ( unsigned long ) used, ( unsigned long ) size );
+    fprintf( stderr, "\r[%3u%%] %c hits: %10lu / %10lu", pc / 4,
+             spinner[pc % 4], ( unsigned long ) used,
+             ( unsigned long ) size );
     fflush( stderr );
     *lastpc = pc;
     *lastused = used;
@@ -342,7 +346,7 @@ int
 main( int argc, char *argv[] ) {
   struct phash *data;
   struct correlation *c;
-  size_t nent = 1000, nused;
+  size_t nent = 1000, nused, count = 0;
   int ch;
 
   static struct option opts[] = {
@@ -385,14 +389,15 @@ main( int argc, char *argv[] ) {
       die( "Can't read %s", argv[1] );
     }
     mention( "Reading %s", argv[1] );
-    data = read_file( fl );
+    data = read_file( fl, &count );
     fclose( fl );
   }
   else {
-    data = read_file( stdin );
+    data = read_file( stdin, &count );
   }
 
-  mention( "Looking for %lu collisions", ( unsigned long ) nent );
+  mention( "Looking for %lu duplicates in %lu files",
+           ( unsigned long ) nent, ( unsigned long ) count );
 
 #ifdef DEBUG
   dump_phash( data );
