@@ -257,12 +257,48 @@ best_distance( const struct phash *pi, const struct phash *pj ) {
   return distance;
 }
 
+static unsigned long
+calc_work( const struct phash *data ) {
+  unsigned long total = 0, pass = 0;
+  const struct phash *pi;
+
+  /* The number we're after is count * (count - 1) / 2 - but since we
+   * don't have the count we might as well walk the list. This comment
+   * exists purely to demonstrate that I know how to calculate the
+   * number of iterations properly :)
+   */
+
+  for ( pi = data; pi; pi = pi->next ) {
+    total += pass++;
+  }
+  return total;
+}
+
+static void
+progress( unsigned long done, unsigned long total, size_t used,
+          size_t size, unsigned int *lastpc, size_t * lastused ) {
+  unsigned int pc = 400 * done / total;
+  static char *spinner = "-\\|/";
+  if ( pc != *lastpc || used / 100 != *lastused / 100
+       || ( used == size && *lastused != size ) ) {
+    fprintf( stderr, "\r[%3u%%] %c hits: %10lu / %10lu", pc / 4, spinner[pc % 4],
+             ( unsigned long ) used, ( unsigned long ) size );
+    fflush( stderr );
+    *lastpc = pc;
+    *lastused = used;
+  }
+}
+
 static struct correlation *
 correlate( const struct phash *data, size_t nent, size_t * nused ) {
   struct correlation *c = new_correlation( nent );
   const struct phash *pi, *pj;
   unsigned distance;
   unsigned char bitcount[256];
+  unsigned long total = calc_work( data );
+  unsigned long done = 0;
+  unsigned int lastpc = -1;
+  size_t lastused = 0;
 
   *nused = 0;
 
@@ -270,9 +306,10 @@ correlate( const struct phash *data, size_t nent, size_t * nused ) {
 
   /* O(N^2) :) */
   for ( pi = data; pi; pi = pi->next ) {
-    if ( verbose )
-      fprintf( stderr, "." );
     for ( pj = pi->next; pj; pj = pj->next ) {
+      if ( verbose ) {
+        progress( done++, total, *nused, nent, &lastpc, &lastused );
+      }
       /* don't know if this summary stuff is worth the bother */
       if ( *nused == nent
            && best_distance( pi, pj ) >= c[*nused - 1].distance ) {
@@ -284,8 +321,10 @@ correlate( const struct phash *data, size_t nent, size_t * nused ) {
       }
     }
   }
-  if ( verbose )
+  if ( verbose ) {
+    progress( done++, total, *nused, nent, &lastpc, &lastused );
     fprintf( stderr, "\n" );
+  }
   return c;
 }
 
