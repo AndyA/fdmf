@@ -130,13 +130,13 @@ calc_band_energies( fftw_complex * out, double *be ) {
 
 static void
 audio_to_fftw( char *buf, fftw_complex * in ) {
+  unsigned char *dp = ( unsigned char * ) buf;
   int i;
-  short *sp;
-  sp = ( short * ) buf;
   for ( i = 0; i < CHUNKSAMPS; i++ ) {
-    double left, right;
-    left = ( double ) *sp++;
-    right = ( double ) *sp++;
+    /* Cast to short to force sign extension. Is this portable? */
+    double left = ( short ) ( dp[0] | ( dp[1] << 8 ) );
+    double right = ( short ) ( dp[2] | ( dp[3] << 8 ) );
+    dp += 4;
     in[i][0] = left + right;
   }
 }
