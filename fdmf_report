@@ -33,9 +33,8 @@ while ( <> ) {
   my ( $distance, $this, $that ) = split;
   die "Bad input\n" unless defined $that && $distance =~ /^\d+$/;
   print join( "\n",
-    $distance,
-    names_for_phash( $this ),
-    names_for_phash( $that ) ),
+    $distance, names_for_phash( $this ),
+    '',        names_for_phash( $that ) ),
    "\n\n";
 }
 
