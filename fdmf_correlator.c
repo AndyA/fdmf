@@ -12,8 +12,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <pthread.h>
-
 #define PROG "fdmf_correlator"
 #define HASH_LEN 768
 #define HASH_BYTES (HASH_LEN / 8)
@@ -22,7 +20,6 @@
 #define SUMMARY_SPAN (HASH_BYTES/SUMMARY_LEN)
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
-#define QUEUE_SIZE 100000
 
 struct phash {
   struct phash *next;
@@ -33,26 +30,6 @@ struct phash {
 struct correlation {
   const struct phash *pair[2];
   unsigned int distance;
-};
-
-struct context {
-  const struct phash *data;
-  size_t nent;
-  size_t *nused;
-  struct correlation *c;
-  volatile int done;
-
-  /* queue */
-  unsigned int in;
-  unsigned int out;
-  struct correlation queue[QUEUE_SIZE];
-
-  pthread_mutex_t queue_lock;
-  pthread_cond_t data_available, space_available;
-
-  /* queue stats */
-  unsigned data_wait;
-  unsigned space_wait;
 };
 
 static int verbose = 0;
@@ -274,6 +251,15 @@ hash_distance( const struct phash *pi, const struct phash *pj,
   return distance;
 }
 
+static unsigned int
+best_distance( const struct phash *pi, const struct phash *pj ) {
+  unsigned i, distance = 0;
+  for ( i = 0; i < SUMMARY_LEN; i++ ) {
+    distance += abs( ( int ) pi->summary[i] - ( int ) pj->summary[i] );
+  }
+  return distance;
+}
+
 static unsigned long
 calc_work( const struct phash *data ) {
   unsigned long total = 0, pass = 0;
@@ -292,149 +278,58 @@ calc_work( const struct phash *data ) {
 }
 
 static void
-progress( unsigned long done, unsigned long total, unsigned int *lastpc ) {
+progress( unsigned long done, unsigned long total, size_t used,
+          size_t size, unsigned int *lastpc, size_t * lastused ) {
   unsigned int pc = 400 * done / total;
   static char *spinner = "-\\|/";
-  if ( pc != *lastpc ) {
-    fprintf( stderr, "\r[%3u%%] %c", pc / 4, spinner[pc % 4] );
+  if ( pc != *lastpc || used / 100 != *lastused / 100
+       || ( used == size && *lastused != size ) ) {
+    fprintf( stderr, "\r[%3u%%] %c correlations: %10lu / %10lu", pc / 4,
+             spinner[pc % 4], ( unsigned long ) used,
+             ( unsigned long ) size );
     fflush( stderr );
     *lastpc = pc;
+    *lastused = used;
   }
-}
-
-static int
-queue_get( struct context *ctx, struct correlation *cp ) {
-  pthread_mutex_lock( &ctx->queue_lock );
-  while ( !ctx->done && ctx->in == ctx->out ) {
-    /* we wake up either when there's data in the queue or when the
-     * correlator has finished - which means we may expect no more data
-     */
-    ctx->data_wait++;
-    pthread_cond_wait( &ctx->data_available, &ctx->queue_lock );
-  }
-  if ( ctx->done ) {
-    pthread_mutex_unlock( &ctx->queue_lock );
-    return 0;
-  }
-  *cp = ctx->queue[ctx->out++];
-  if ( ctx->out == QUEUE_SIZE )
-    ctx->out = 0;
-  pthread_mutex_unlock( &ctx->queue_lock );
-  pthread_cond_signal( &ctx->space_available );
-  return 1;
-}
-
-static void
-queue_put( struct context *ctx,
-           const struct phash *this, const struct phash *that,
-           unsigned distance ) {
-  unsigned next_in;
-  pthread_mutex_lock( &ctx->queue_lock );
-  for ( ;; ) {
-    next_in = ctx->in + 1;
-    if ( next_in == QUEUE_SIZE )
-      next_in = 0;
-    if ( next_in != ctx->out )
-      break;
-    ctx->space_wait++;
-    pthread_cond_wait( &ctx->space_available, &ctx->queue_lock );
-  }
-  ctx->queue[ctx->in].pair[0] = this;
-  ctx->queue[ctx->in].pair[1] = that;
-  ctx->queue[ctx->in].distance = distance;
-  ctx->in = next_in;
-  pthread_mutex_unlock( &ctx->queue_lock );
-  pthread_cond_signal( &ctx->data_available );
-}
-
-static void *
-correlator_w( void *ptr ) {
-  struct context *ctx = ( struct context * ) ptr;
-  const struct phash *pi, *pj;
-  unsigned distance;
-  unsigned char bitcount[256];
-  unsigned long total = calc_work( ctx->data );
-  unsigned long done = 0;
-  unsigned int lastpc = -1;
-
-  *( ctx->nused ) = 0;
-
-  compute_bitcount( bitcount );
-
-  /* O(N^2) :) */
-  for ( pi = ctx->data; pi; pi = pi->next ) {
-    for ( pj = pi->next; pj; pj = pj->next ) {
-      if ( verbose ) {
-        progress( done++, total, &lastpc );
-      }
-      distance = hash_distance( pi, pj, bitcount );
-      queue_put( ctx, pi, pj, distance );
-    }
-  }
-
-  pthread_mutex_lock( &ctx->queue_lock );
-  ctx->done = 1;
-  pthread_mutex_unlock( &ctx->queue_lock );
-  pthread_cond_signal( &ctx->data_available );
-
-  if ( verbose ) {
-    progress( done, total, &lastpc );
-    fprintf( stderr, "\n" );
-  }
-  return NULL;
-}
-
-static void *
-inserter_w( void *ptr ) {
-  struct context *ctx = ( struct context * ) ptr;
-  struct correlation corr;
-  while ( queue_get( ctx, &corr ) ) {
-    if ( *( ctx->nused ) < ctx->nent
-         || corr.distance < ctx->c[*ctx->nused - 1].distance ) {
-      insert_correlation( ctx->c, ctx->nent, ctx->nused, corr.pair[0],
-                          corr.pair[1], corr.distance );
-    }
-  }
-  return NULL;
 }
 
 static struct correlation *
 correlate( const struct phash *data, size_t nent, size_t * nused ) {
-  pthread_t correlator, inserter;
-  struct context ctx;
-  int rc;
+  struct correlation *c = new_correlation( nent );
+  const struct phash *pi, *pj;
+  unsigned distance;
+  unsigned char bitcount[256];
+  unsigned long total = calc_work( data );
+  unsigned long done = 0;
+  unsigned int lastpc = -1;
+  size_t lastused = 0;
 
-  ctx.data = data;
-  ctx.nent = nent;
-  ctx.nused = nused;
-  ctx.done = 0;
-  ctx.c = new_correlation( nent );
-  ctx.in = ctx.out = 0;
-  ctx.space_wait = ctx.data_wait = 0;
+  *nused = 0;
 
-  ( void ) pthread_mutex_init( &ctx.queue_lock, NULL );
-  ( void ) pthread_cond_init( &ctx.data_available, NULL );
-  ( void ) pthread_cond_init( &ctx.space_available, NULL );
+  compute_bitcount( bitcount );
 
-  if ( rc = pthread_create( &correlator, NULL, correlator_w, &ctx ), rc ) {
-    die( "Failed to create correlator thread: %d", rc );
+  /* O(N^2) :) */
+  for ( pi = data; pi; pi = pi->next ) {
+    for ( pj = pi->next; pj; pj = pj->next ) {
+      if ( verbose ) {
+        progress( done++, total, *nused, nent, &lastpc, &lastused );
+      }
+      /* don't know if this summary stuff is worth the bother */
+      if ( *nused == nent
+           && best_distance( pi, pj ) >= c[*nused - 1].distance ) {
+        continue;
+      }
+      distance = hash_distance( pi, pj, bitcount );
+      if ( *nused < nent || distance < c[*nused - 1].distance ) {
+        insert_correlation( c, nent, nused, pi, pj, distance );
+      }
+    }
   }
-
-  if ( rc = pthread_create( &inserter, NULL, inserter_w, &ctx ), rc ) {
-    die( "Failed to create inserter thread: %d", rc );
+  if ( verbose ) {
+    progress( done++, total, *nused, nent, &lastpc, &lastused );
+    fprintf( stderr, "\n" );
   }
-
-  pthread_join( correlator, NULL );
-  pthread_join( inserter, NULL );
-
-  pthread_mutex_destroy( &ctx.queue_lock );
-  pthread_cond_destroy( &ctx.data_available );
-  pthread_cond_destroy( &ctx.space_available );
-
-  mention( "Waited for data %lu times", ctx.data_wait );
-  mention( "Waited for space %lu times", ctx.space_wait );
-
-  return ctx.c;
+  return c;
 }
 
 static void
