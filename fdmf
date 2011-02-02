@@ -18,16 +18,22 @@ use IPC::Run qw( run );
 use Memoize;
 use Storable;
 
-use constant DBFILE => glob '~/.fdmf';
-
-my %Opt = ( verbose => 0 );
+my %Opt = (
+  verbose => 0,
+  db      => undef,
+);
 
 memoize qw( find_prog );
 
 find_prog( 'spline' );
 
-GetOptions( 'verbose' => \$Opt{verbose} ) or usage( 1 );
+GetOptions(
+  'verbose' => \$Opt{verbose},
+  'D|db:s'  => \$Opt{db},
+) or usage( 1 );
 @ARGV = '.' unless @ARGV;
+die "The --db switch must be supplied\n"
+ unless $Opt{db};
 
 =head2 Data Representation
 
@@ -51,8 +57,8 @@ Maps an SHA1 hash to the perceptual hash information for the file
 
 =cut
 
-our $DB = get_db( DBFILE );
-END { put_db( DBFILE, $DB ) if defined $DB }
+our $DB = get_db( $Opt{db} );
+END { put_db( $Opt{db}, $DB ) if defined $DB }
 
 fdmf( @ARGV );
 

@@ -3,11 +3,22 @@
 use strict;
 use warnings;
 
+use Getopt::Long;
 use Storable;
 
-use constant DBFILE => glob '~/.fdmf';
+my %Opt = (
+  verbose => 0,
+  db      => undef,
+);
 
-our $DB = get_db( DBFILE );
+GetOptions(
+  'verbose' => \$Opt{verbose},
+  'D|db:s'  => \$Opt{db},
+) or usage( 1 );
+die "The --db switch must be supplied\n"
+ unless $Opt{db};
+
+our $DB = get_db( $Opt{db} );
 
 my %ph2f = ();
 while ( my ( $name, $sig ) = each %{ $DB->{f} } ) {

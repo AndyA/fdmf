@@ -3,14 +3,32 @@
 use strict;
 use warnings;
 
+use Getopt::Long;
 use Storable;
 
-use constant DBFILE => glob '~/.fdmf';
+my %Opt = (
+  verbose => 0,
+  db      => undef,
+);
 
-die "No ", DBFILE, "\n" unless -e DBFILE;
-my $db   = retrieve DBFILE;
+GetOptions(
+  'verbose' => \$Opt{verbose},
+  'D|db:s'  => \$Opt{db},
+) or usage( 1 );
+die "The --db switch must be supplied\n"
+ unless $Opt{db};
+usage( 2 ) if @ARGV;
+
+die "No $Opt{db}\n" unless -e $Opt{db};
+my $db   = retrieve $Opt{db};
 my %seen = ();
 print "$_\n"
  for sort grep { defined && !$seen{$_}++ } values %{ $db->{h} };
+
+sub usage {
+  my $rc = shift;
+  print STDERR "Usage: fdmf_dump --db db\n";
+  exit $rc if defined $rc;
+}
 
 # vim:ts=2:sw=2:sts=2:et:ft=perl

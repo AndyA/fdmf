@@ -6,9 +6,10 @@ use warnings;
 use Getopt::Long;
 use Storable;
 
-use constant DBFILE => glob '~/.fdmf';
-
-my %Opt = ( verbose => 0 );
+my %Opt = (
+  verbose => 0,
+  db      => undef,
+);
 
 my %Desc = (
   f => 'file',
@@ -16,10 +17,16 @@ my %Desc = (
   h => 'phash',
 );
 
-GetOptions( 'verbose' => \$Opt{verbose} ) or usage( 1 );
+GetOptions(
+  'verbose' => \$Opt{verbose},
+  'D|db:s'  => \$Opt{db},
+) or usage( 1 );
+usage( 2 ) if @ARGV;
+die "The --db switch must be supplied\n"
+ unless $Opt{db};
 
-our $DB = get_db( DBFILE );
-END { put_db( DBFILE, $DB ) if defined $DB }
+our $DB = get_db( $Opt{db} );
+END { put_db( $Opt{db}, $DB ) if defined $DB }
 
 my %before = stats( $DB );
 
