@@ -17,18 +17,46 @@ GetOptions(
 ) or usage( 1 );
 die "The --db switch must be supplied\n"
  unless $Opt{db};
-usage( 2 ) if @ARGV;
-
 die "No $Opt{db}\n" unless -e $Opt{db};
-my $db   = retrieve $Opt{db};
+my $db = retrieve $Opt{db};
+
+my @files = keys %{ $db->{f} };
+if ( @ARGV ) {
+  my $like = qr{@{[ globs2re( @ARGV ) ]}};
+  @files = grep { $_ =~ $like } @files;
+}
 my %seen = ();
 print "$_\n"
- for sort grep { defined && !$seen{$_}++ } values %{ $db->{h} };
+ for sort grep { defined && !$seen{$_}++ }
+ @{ $db->{h} }{ @{ $db->{i} }{ @{ $db->{f} }{@files} } };
 
 sub usage {
   my $rc = shift;
   print STDERR "Usage: fdmf_dump --db db\n";
   exit $rc if defined $rc;
+}
+
+sub globs2re {
+  join '', '(?:', join( ')|(?:', map { glob2re( $_ ) } @_ ), ')';
+}
+
+sub glob2re {
+  my $glob   = shift;
+  my $anchor = '';
+  my @part   = ();
+  while () {
+    if ( $glob =~ /\G([\\\/])/gc ) {
+      push @part, quotemeta $1;
+      $anchor = '^';
+      next;
+    }
+    if ( $glob =~ /\G\*\*/gc ) { push @part, '.*';         next }
+    if ( $glob =~ /\G\*/gc )   { push @part, '[^\\/]*';    next }
+    if ( $glob =~ /\G\?/gc )   { push @part, '.';          next }
+    if ( $glob =~ /\G(.)/gc )  { push @part, quotemeta $1; next }
+    last;
+  }
+  return join '', $anchor, @part, '$';
 }
 
 # vim:ts=2:sw=2:sts=2:et:ft=perl
