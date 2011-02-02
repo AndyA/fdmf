@@ -8,16 +8,19 @@ use Storable;
 
 my %Opt = (
   verbose => 0,
+  files   => 0,
   db      => undef,
 );
 
 GetOptions(
   'verbose' => \$Opt{verbose},
+  'files'   => \$Opt{files},
   'D|db:s'  => \$Opt{db},
 ) or usage( 1 );
-die "The --db switch must be supplied\n"
- unless $Opt{db};
+
+die "The --db switch must be supplied\n" unless $Opt{db};
 die "No $Opt{db}\n" unless -e $Opt{db};
+
 my $db = retrieve $Opt{db};
 
 my @files = keys %{ $db->{f} };
@@ -25,10 +28,16 @@ if ( @ARGV ) {
   my $like = qr{@{[ globs2re( @ARGV ) ]}};
   @files = grep { $_ =~ $like } @files;
 }
-my %seen = ();
-print "$_\n"
- for sort grep { defined && !$seen{$_}++ }
- @{ $db->{h} }{ @{ $db->{i} }{ @{ $db->{f} }{@files} } };
+
+if ( $Opt{files} ) {
+  print "$_\n" for sort @files;
+}
+else {
+  my %seen = ();
+  print "$_\n"
+   for sort grep { defined && !$seen{$_}++ }
+   @{ $db->{h} }{ @{ $db->{i} }{ @{ $db->{f} }{@files} } };
+}
 
 sub usage {
   my $rc = shift;
