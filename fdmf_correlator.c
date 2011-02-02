@@ -314,7 +314,6 @@ correlate( const struct phash *data, size_t nent, size_t * nused ) {
       if ( verbose ) {
         progress( done++, total, *nused, nent, &lastpc, &lastused );
       }
-      /* don't know if this summary stuff is worth the bother */
       if ( *nused == nent
            && best_distance( pi, pj ) >= c[*nused - 1].distance ) {
         continue;
