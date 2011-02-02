@@ -40,7 +40,7 @@ struct context {
   size_t nent;
   size_t *nused;
   struct correlation *c;
-  volatile int done;
+  int done;
 
   /* queue */
   unsigned int in;
