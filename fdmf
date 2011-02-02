@@ -18,14 +18,15 @@ use IPC::Run qw( run );
 use Memoize;
 use Storable;
 
+memoize qw( find_prog );
+
+find_prog( 'spline' );
+find_prog( 'fdmf_sonic_reducer', $FindBin::Bin );
+
 my %Opt = (
   verbose => 0,
   db      => undef,
 );
-
-memoize qw( find_prog );
-
-find_prog( 'spline' );
 
 GetOptions(
   'verbose' => \$Opt{verbose},
@@ -187,7 +188,7 @@ sub find_prog {
     return $try if -x $try;
   }
   my $bin = which( $name );
-  die "Can't find $name on PATH\n" unless defined $bin;
+  die "Can't find $name on path\n" unless defined $bin;
   return $bin;
 }
 
