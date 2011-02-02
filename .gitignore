@@ -2,6 +2,8 @@
 .*.swp
 Session.vim
 cmd.log
+db
+db.old
 dump
 dump.*
 dups
