@@ -1,5 +1,5 @@
 CC =  gcc
-CFLAGS = -O2 -W -Wall -I/usr/local/include -L/usr/local/lib -I/opt/local/include -L/opt/local/lib
+CFLAGS = -O3 -W -Wall -I/usr/local/include -L/usr/local/lib -I/opt/local/include -L/opt/local/lib
 
 all : fdmf_sonic_reducer fdmf_correlator
 
