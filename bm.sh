@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 time \
   ./fdmf_correlator -v --keep 100000 wrk/sfx-dump > /dev/null
