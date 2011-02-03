@@ -11,7 +11,7 @@ fdmf_sonic_reducer : fdmf_sonic_reducer.o
 	$(CC) $(CFLAGS) -lfftw3 -lm $< -o $@
 
 clean :  
-	rm -f *.o fdmf_sonic_reducer fdmf_correlator $(OBJS) tags
+	rm -f *.o fdmf_sonic_reducer fdmf_correlator $(OBJS) tags *.gcda *.gcno *.gcov *.o *.out
 
 .PHONY: tags
 tags :
