@@ -310,10 +310,12 @@ correlate( const struct phash *data, size_t nent, size_t * nused ) {
 
   /* O(N^2) :) */
   for ( pi = data; pi; pi = pi->next ) {
+    if ( verbose ) {
+      /* TODO is this called often enough? */
+      progress( done, total, *nused, nent, &lastpc, &lastused );
+    }
     for ( pj = pi->next; pj; pj = pj->next ) {
-      if ( verbose ) {
-        progress( done++, total, *nused, nent, &lastpc, &lastused );
-      }
+      done++;
       if ( *nused == nent
            && best_distance( pi, pj ) >= c[*nused - 1].distance ) {
         continue;
