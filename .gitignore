@@ -1,4 +1,8 @@
+*.gcda
+*.gcno
+*.gcov
 *.o
+*.out
 .*.swp
 Session.vim
 cmd.log
@@ -13,3 +17,4 @@ fdmf_sonic_reducer
 fdmf_vector_pairs
 report
 tags
+wrk
