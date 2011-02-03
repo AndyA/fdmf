@@ -8,7 +8,7 @@ use File::Spec;
 use Test::More;
 use Test::Differences;
 
-use constant TESTS => ( 1 );
+use constant TESTS => ( 1 .. 2 );
 
 plan tests => TESTS * 1;
 
