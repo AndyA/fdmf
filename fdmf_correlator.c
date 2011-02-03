@@ -202,7 +202,6 @@ dump_phash( const struct phash *ph ) {
     ph = ph->next;
   }
 }
-
 #endif
 
 static void
@@ -236,7 +235,7 @@ insert_correlation( struct correlation *c, size_t nent, size_t * nused,
 static void
 compute_bitcount( unsigned char *bitcount ) {
   unsigned i;
-  for ( i = 0; i < 256; i++ ) {
+  for ( i = 0; i < 65536; i++ ) {
     bitcount[i] = count_bits( i );
   }
 }
@@ -245,8 +244,10 @@ static unsigned int
 hash_distance( const struct phash *pi, const struct phash *pj,
                const unsigned char *bitcount ) {
   unsigned i, distance = 0;
-  for ( i = 0; i < HASH_BYTES; i++ ) {
-    distance += bitcount[pi->bits[i] ^ pj->bits[i]];
+  unsigned short *si = ( unsigned short * ) pi->bits;
+  unsigned short *sj = ( unsigned short * ) pj->bits;
+  for ( i = 0; i < HASH_BYTES / 2; i++ ) {
+    distance += bitcount[si[i] ^ sj[i]];
   }
   return distance;
 }
@@ -298,7 +299,7 @@ correlate( const struct phash *data, size_t nent, size_t * nused ) {
   struct correlation *c = new_correlation( nent );
   const struct phash *pi, *pj;
   unsigned distance;
-  unsigned char bitcount[256];
+  unsigned char bitcount[65536];
   unsigned long total = calc_work( data );
   unsigned long done = 0;
   unsigned int lastpc = -1;
