@@ -7,9 +7,10 @@ use Data::Dumper;
 use File::Spec;
 use List::Util qw( max );
 
+chdir 'bm' or die "Can't cd bm\n";
 my @bm_dir = map { $_->[0] }
  sort { $a->[1] <=> $b->[1] || $a->[0] cmp $b->[0] }
- map { [ $_, /baseline/ ? 0 : 1 ] } grep { -d } glob 'bm-*';
+ map { [ $_, /baseline/ ? 0 : 1 ] } grep { -d } glob '*';
 
 my $bm   = read_all( @bm_dir );
 my %keep = ();
