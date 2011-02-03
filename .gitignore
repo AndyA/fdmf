@@ -5,7 +5,7 @@
 *.out
 .*.swp
 Session.vim
-bm-*
+bm
 cmd.log
 db
 db.old
