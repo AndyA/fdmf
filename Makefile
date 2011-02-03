@@ -19,5 +19,5 @@ clean:
 tags:
 	ctags *.c *.h
 
-test:
+test: all
 	prove -r t
