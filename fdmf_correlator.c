@@ -363,10 +363,10 @@ correlator_w( void *ptr ) {
 
   /* O(N^2) :) */
   for ( pi = ctx->data; pi; pi = pi->next ) {
+    if ( verbose ) {
+      progress( done++, total, &lastpc );
+    }
     for ( pj = pi->next; pj; pj = pj->next ) {
-      if ( verbose ) {
-        progress( done++, total, &lastpc );
-      }
       distance = hash_distance( pi, pj, bitcount );
       queue_put( ctx, pi, pj, distance );
     }
