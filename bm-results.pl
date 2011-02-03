@@ -21,7 +21,7 @@ my @width
 printf join( ' | ', map { "%-${_}s" } @width ) . "\n", 'keep', @bm_dir;
 for my $k ( sort { $a <=> $b } keys %keep ) {
   printf join( ' | ', map { "%${_}s" } @width ) . "\n", $k,
-   map { $bm->{$_}{$k}{elapsed} || 'n/a' } @bm_dir;
+   map { seconds( $bm->{$_}{$k}{elapsed} ) || 'n/a' } @bm_dir;
 }
 
 sub read_all {
@@ -49,6 +49,19 @@ sub read_time {
   chomp( my $times = <$fh> );
   my %t = split /=/, $times;
   return \%t;
+}
+
+sub seconds {
+  my $tm = shift or return;
+  my @tp = split /:/, $tm;
+  my @mu = ( 60, 60, 100 );
+  my $se = 0;
+  my $mu = 1;
+  while ( @tp ) {
+    $se += $mu * pop @tp;
+    $mu *= shift @mu;
+  }
+  return sprintf '%.2f', $se;
 }
 
 # vim:ts=2:sw=2:sts=2:et:ft=perl
