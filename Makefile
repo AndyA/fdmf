@@ -4,17 +4,20 @@ CC =  gcc
 OPTIMIZE=-O3
 CFLAGS = $(OPTIMIZE) -W -Wall -I/usr/local/include -L/usr/local/lib -I/opt/local/include -L/opt/local/lib
 
-all : fdmf_sonic_reducer fdmf_correlator
+all: fdmf_sonic_reducer fdmf_correlator
 
-fdmf_correlator : fdmf_correlator.o
+fdmf_correlator: fdmf_correlator.o
 	$(CC) $(CFLAGS) $< -o $@
 
-fdmf_sonic_reducer : fdmf_sonic_reducer.o
+fdmf_sonic_reducer: fdmf_sonic_reducer.o
 	$(CC) $(CFLAGS) -lfftw3 -lm $< -o $@
 
-clean :  
+clean:  
 	rm -f *.o fdmf_sonic_reducer fdmf_correlator $(OBJS) tags *.gcda *.gcno *.gcov *.o *.out
 
 .PHONY: tags
-tags :
+tags:
 	ctags *.c *.h
+
+test:
+	prove -r t
