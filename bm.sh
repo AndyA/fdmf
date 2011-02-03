@@ -6,7 +6,7 @@ timer="/usr/bin/time --format=sys=%S=user=%S=elapsed=%E"
 
 branch=$(git status | perl -ne '/On\s+branch\s+(\S+)/ && print $1')
 echo "Testing $branch"
-bmdir="bm-$branch"
+bmdir="bm/$(hostname -s)-$branch"
 rm -rf $bmdir
 mkdir -p $bmdir
 
