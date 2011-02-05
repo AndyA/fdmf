@@ -98,6 +98,9 @@ read_hash( FILE * fl, unsigned char hash[HASH_BYTES] ) {
       }
       return 1;
     }
+    if ( hp > HASH_CHARS ) {
+      die( "Hash too long" );
+    }
     if ( c < 0 || c > 255 || !isxdigit( c ) ) {
       die( "Illegal character '%c' in data", c );
     }
