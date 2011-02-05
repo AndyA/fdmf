@@ -16,7 +16,7 @@ use FindBin;
 use Getopt::Long;
 use IPC::Run qw( run );
 use Memoize;
-use Storable;
+use Storable qw( nstore );
 
 memoize qw( find_prog );
 
@@ -172,7 +172,7 @@ sub put_db {
     my $bak = "$db.old";
     rename $db, $bak or die "Can't rename $db as $bak: $!\n";
   }
-  store $data, $db;
+  nstore $data, $db;
 }
 
 sub usage {
