@@ -66,7 +66,7 @@ count_bits( unsigned int v ) {
 }
 
 static unsigned int
-count_hash_bits( unsigned char *hash, size_t bytes ) {
+count_hash_bits( const unsigned char *hash, size_t bytes ) {
   unsigned int i, c = 0;
   for ( i = 0; i < bytes; i++ ) {
     c += count_bits( hash[i] );
@@ -111,7 +111,7 @@ read_hash( FILE * fl, unsigned char hash[HASH_BYTES] ) {
 }
 
 static struct phash *
-new_phash( unsigned char *hash, struct phash *next ) {
+new_phash( const unsigned char *hash, struct phash *next ) {
   int i = 0;
   struct phash *ph = safe_malloc( sizeof( struct phash ) );
   ph->next = next;
