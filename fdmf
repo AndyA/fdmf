@@ -14,9 +14,12 @@ use File::Spec;
 use File::Which;
 use FindBin;
 use Getopt::Long;
+use IO::Handle;
+use IO::Select;
 use IPC::Run qw( run );
 use Memoize;
-use Storable qw( nstore );
+use POSIX ":sys_wait_h";
+use Storable qw( store_fd fd_retrieve nstore retrieve );
 
 memoize qw( find_prog );
 
@@ -26,11 +29,13 @@ find_prog( 'fdmf_sonic_reducer', $FindBin::Bin );
 my %Opt = (
   verbose => 0,
   db      => undef,
+  jobs    => 1,
 );
 
 GetOptions(
   'verbose' => \$Opt{verbose},
   'D|db:s'  => \$Opt{db},
+  'jobs:i'  => \$Opt{jobs},
 ) or usage( 1 );
 @ARGV = '.' unless @ARGV;
 die "The --db switch must be supplied\n"
@@ -62,9 +67,10 @@ our $DB = get_db( $Opt{db} );
 END { put_db( $Opt{db}, $DB ) if defined $DB }
 
 fdmf( @ARGV );
+cleanup();
 
 sub mention(@) {
-  print join( ' ', @_ ), "\n" if $Opt{verbose};
+  print join( '', @_ ), "\n" if $Opt{verbose};
 }
 
 sub fdmf {
@@ -92,8 +98,98 @@ sub process {
 
   return if exists $DB->{h}{$hash};
   mention "Analysing $file";
-  $DB->{h}{$hash} = eval { sonic_reduce( $file ) };
-  print STDERR "Error processing $file: $@\n" if $@;
+  schedule(
+    sub {
+      my $sr = eval { sonic_reduce( $file ) };
+      print STDERR "Error processing $file: $@\n" if $@;
+      return $sr;
+    },
+    sub {
+      $DB->{h}{$hash} = shift;
+    }
+  );
+}
+
+{
+  my %active;
+  my @queue;
+  my $select;
+
+  sub schedule {
+    my ( $worker, $done ) = @_;
+    if ( $Opt{jobs} > 1 ) {
+      push @queue, [ $worker, $done ];
+      pump();
+    }
+    else {
+      $done->( $worker->() );
+    }
+  }
+
+  sub cleanup {
+    if ( keys %active ) {
+      mention "Waiting for ", scalar( keys %active ),
+       " jobs to complete\n";
+      while ( keys %active ) {
+        pump();
+        sleep 1;
+      }
+    }
+  }
+
+  sub pump {
+    return unless $Opt{jobs} > 1;
+    $select ||= IO::Select->new;
+
+    for my $rdy ( $select->can_read( 0 ) ) {
+      my ( $rh, $pid ) = @$rdy;
+      $active{$pid}->( fd_retrieve( $rh )->[0] );
+      $select->remove( $rh );
+    }
+
+    WAIT:
+    {
+      last WAIT unless keys %active;
+      my $pid = waitpid -1, WNOHANG;
+      if ( defined $pid && exists $active{$pid} ) {
+        delete $active{$pid};
+        redo WAIT;
+      }
+    }
+
+    while ( @queue && keys %active < $Opt{jobs} ) {
+      my ( $worker, $done ) = @{ shift @queue };
+
+      my $my_rdr    = IO::Handle->new;
+      my $child_wtr = IO::Handle->new;
+
+      pipe $my_rdr, $child_wtr
+       or die "Can't open write pipe ($!)\n";
+
+      if ( my $pid = fork ) {
+        # Parent
+        close $child_wtr;
+        $active{$pid} = $done;
+        $select->add( [ $my_rdr, $pid ] );
+      }
+      else {
+        # Child
+        close $my_rdr;
+
+        # Don't execute any END blocks
+        use POSIX '_exit';
+        eval q{END { _exit 0 }};
+
+        my $result = eval { $worker->() };
+        warn $@ if $@;
+        store_fd [$result], $child_wtr;
+
+        close $child_wtr;
+        # We use CORE::exit for MP compatibility
+        CORE::exit;
+      }
+    }
+  }
 }
 
 sub sonic_reduce {
