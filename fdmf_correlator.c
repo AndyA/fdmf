@@ -415,8 +415,10 @@ new_index( struct phash *data,
 
 static void
 free_index( struct index *idx ) {
-  free( idx->data );
-  free( idx );
+  if ( idx ) {
+    free( idx->data );
+    free( idx );
+  }
 }
 
 static void
