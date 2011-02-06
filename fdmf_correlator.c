@@ -264,6 +264,38 @@ best_distance( const struct phash *pi, const struct phash *pj ) {
   return distance;
 }
 
+static void
+centre( const struct phash *data, double c[HASH_LEN] ) {
+  const struct phash *pi;
+  unsigned i, count;
+  for ( i = 0; i < HASH_LEN; i++ ) {
+    c[i] = 0;
+  }
+
+  for ( count = 0, pi = data; pi; pi = pi->next ) {
+    for ( i = 0; i < HASH_LEN; i++ ) {
+      c[i] += ( pi->bits[i >> 3] & ( 1 << ( i & 7 ) ) ) ? 1 : 0;
+    }
+    count++;
+  }
+  for ( i = 0; i < HASH_LEN; i++ ) {
+    c[i] /= count;
+  }
+}
+
+static void
+show_centre( const struct phash *data ) {
+  int x, y;
+  double c[HASH_LEN];
+  centre( data, c );
+  for ( y = 0; y < HASH_LEN; y += 32 ) {
+    for ( x = 0; x < 32; x++ ) {
+      printf( "%4.2f ", c[x + y] );
+    }
+    printf( "\n" );
+  }
+}
+
 static unsigned long
 calc_work( const struct phash *data ) {
   unsigned long total = 0, pass = 0;
@@ -408,8 +440,9 @@ main( int argc, char *argv[] ) {
   dump_phash( data );
 #endif
 
-  c = correlate( data, nent, &nused );
-  show_correlation( c, nused );
+  show_centre( data );
+/*  c = correlate( data, nent, &nused );*/
+/*  show_correlation( c, nused );*/
   free_phash( data );
 
   return 0;
