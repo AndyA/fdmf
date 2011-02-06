@@ -170,6 +170,11 @@ new_correlation( size_t nent ) {
 }
 
 static void
+free_correlation( struct correlation *c ) {
+  free( c );
+}
+
+static void
 show_correlation( const struct correlation *c, size_t nused ) {
   unsigned i;
   for ( i = 0; i < nused; i++ ) {
@@ -410,6 +415,7 @@ main( int argc, char *argv[] ) {
 
   c = correlate( data, nent, &nused );
   show_correlation( c, nused );
+  free_correlation( c );
   free_phash( data );
 
   return 0;
