@@ -223,6 +223,11 @@ new_correlation( size_t nent ) {
 }
 
 static void
+free_correlation( struct correlation *c ) {
+  free( c );
+}
+
+static void
 show_correlation( const struct correlation *c, size_t nused ) {
   unsigned i;
   for ( i = 0; i < nused; i++ ) {
@@ -593,7 +598,7 @@ compute_anchors( struct phash *data ) {
 }
 
 static struct correlation *
-correlate2( const struct phash *data, const struct index *idx, size_t nent,
+correlate2( struct phash *data, const struct index *idx, size_t nent,
             size_t * nused, unsigned maxdist ) {
   struct correlation *c = new_correlation( nent );
   struct index *idx2;
@@ -834,6 +839,7 @@ main( int argc, char *argv[] ) {
   show_correlation( c, nused );
 #endif
 
+  free_correlation( c );
   free_index( idx );
   free_phash( data );
 
