@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for j in 1 4 8 16; do
+for j in 1 2 4 8 16; do
   db="wrk/j$j.db"
   rm -f $db
   set -x

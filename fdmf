@@ -112,6 +112,7 @@ sub process {
 
 {
   my %active;
+  my %callback;
   my @queue;
   my $select;
 
@@ -143,7 +144,7 @@ sub process {
 
     for my $rdy ( $select->can_read( 0 ) ) {
       my ( $rh, $pid ) = @$rdy;
-      $active{$pid}->( fd_retrieve( $rh )->[0] );
+      ( delete $callback{$pid} )->( fd_retrieve( $rh )->[0] );
       $select->remove( $rh );
     }
 
@@ -169,7 +170,8 @@ sub process {
       if ( my $pid = fork ) {
         # Parent
         close $child_wtr;
-        $active{$pid} = $done;
+        $callback{$pid} = $done;
+        $active{$pid}++;
         $select->add( [ $my_rdr, $pid ] );
       }
       else {
