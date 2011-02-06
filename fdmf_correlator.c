@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <getopt.h>
 #include <limits.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,18 +19,40 @@
 #define HASH_CHARS (HASH_LEN / 4)
 #define SUMMARY_LEN 8
 #define SUMMARY_SPAN (HASH_BYTES/SUMMARY_LEN)
+#define HIST_SIZE 100
+#define ANCHORS 8
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+#define ANCHOR_MINDIST(pi, ph, anchor) \
+  fabs( (pi)->anchor_dist[anchor] - (pj)->anchor_dist[anchor] )
+
+#define GET_DIM(ph, bit) \
+  (( (ph)->bits[(bit) >> 3] & ( 1 << ( (bit) & 7 ) ) ) ? 1 : 0)
 
 struct phash {
   struct phash *next;
   unsigned char bits[HASH_BYTES];
   unsigned int summary[SUMMARY_LEN];
+  double anchor_dist[ANCHORS];
 };
 
 struct correlation {
   const struct phash *pair[2];
   unsigned int distance;
+};
+
+struct index {
+  size_t size;
+  struct phash **data;
+  int ( *compar ) ( const void *, const void * );
+};
+
+struct prox_iter {
+  const struct index *idx;
+  double dist;
+  unsigned anchor;
+  long pos_lo, pos_hi;
 };
 
 static int verbose = 0;
@@ -198,8 +221,8 @@ dump_phash( const struct phash *ph ) {
   int i;
   while ( ph ) {
     hexdump( ph->bits, HASH_BYTES );
-    for ( i = 0; i < SUMMARY_LEN; i++ ) {
-      printf( " %3d", ph->summary[i] );
+    for ( i = 0; i < ANCHORS; i++ ) {
+      printf( " %5.2f", ph->anchor_dist[i] );
     }
     printf( "\n" );
     ph = ph->next;
@@ -222,6 +245,9 @@ insert_correlation( struct correlation *c, size_t nent, size_t * nused,
       hi = mid;
     }
   }
+
+  if ( mid + 1 >= nent )
+    return;
 
   nnew = MIN( nent, *nused + 1 );
   memmove( &c[mid + 1], &c[mid], ( nnew - 1 - mid ) * sizeof( c[0] ) );
@@ -264,35 +290,23 @@ best_distance( const struct phash *pi, const struct phash *pj ) {
   return distance;
 }
 
-static void
-centre( const struct phash *data, double c[HASH_LEN] ) {
-  const struct phash *pi;
-  unsigned i, count;
+static double
+anchor_distance( const struct phash *ph, const double c[HASH_LEN] ) {
+  double dist = 0;
+  unsigned i;
   for ( i = 0; i < HASH_LEN; i++ ) {
-    c[i] = 0;
+    double dd = GET_DIM( ph, i ) - c[i];
+    dist += dd * dd;
   }
-
-  for ( count = 0, pi = data; pi; pi = pi->next ) {
-    for ( i = 0; i < HASH_LEN; i++ ) {
-      c[i] += ( pi->bits[i >> 3] & ( 1 << ( i & 7 ) ) ) ? 1 : 0;
-    }
-    count++;
-  }
-  for ( i = 0; i < HASH_LEN; i++ ) {
-    c[i] /= count;
-  }
+  return dist;
 }
 
 static void
-show_centre( const struct phash *data ) {
-  int x, y;
-  double c[HASH_LEN];
-  centre( data, c );
-  for ( y = 0; y < HASH_LEN; y += 32 ) {
-    for ( x = 0; x < 32; x++ ) {
-      printf( "%4.2f ", c[x + y] );
-    }
-    printf( "\n" );
+compute_distance( struct phash *data, unsigned anchor,
+                  const double c[HASH_LEN] ) {
+  struct phash *pi;
+  for ( pi = data; pi; pi = pi->next ) {
+    pi->anchor_dist[anchor] = anchor_distance( pi, c );
   }
 }
 
@@ -327,6 +341,284 @@ progress( unsigned long done, unsigned long total, size_t used,
     *lastpc = pc;
     *lastused = used;
   }
+}
+
+static int
+by_c_distance( const void *a, const void *b ) {
+  const struct phash *pa = *( ( const struct phash ** ) a );
+  const struct phash *pb = *( ( const struct phash ** ) b );
+  return pa->anchor_dist[0] < pb->anchor_dist[0] ? -1
+      : pa->anchor_dist[0] > pb->anchor_dist[0] ? 1 : 0;
+}
+
+static void
+centre( const struct phash *data, double *c ) {
+  const struct phash *pi;
+  unsigned i, count;
+  for ( i = 0; i < HASH_LEN; i++ ) {
+    c[i] = 0;
+  }
+
+  for ( count = 0, pi = data; pi; pi = pi->next ) {
+    for ( i = 0; i < HASH_LEN; i++ ) {
+      c[i] += GET_DIM( pi, i );
+    }
+    count++;
+  }
+  for ( i = 0; i < HASH_LEN; i++ ) {
+    c[i] /= count;
+  }
+}
+
+static struct index *
+new_index( struct phash *data,
+           int ( *compar ) ( const void *a, const void *b ) ) {
+  struct phash *ph;
+  struct index *idx = safe_malloc( sizeof( struct index ) );
+  size_t size;
+
+  for ( size = 0, ph = data; ph; ph = ph->next )
+    size++;
+
+  idx->size = size;
+  idx->data = safe_malloc( sizeof( struct phash ) * size );
+  idx->compar = compar;
+
+  for ( size = 0, ph = data; ph; ph = ph->next ) {
+    idx->data[size++] = ph;
+  }
+
+  return idx;
+}
+
+static void
+sort_index( struct index *idx ) {
+  qsort( idx->data, idx->size, sizeof( struct phash * ), idx->compar );
+}
+
+static void
+print_index( const struct index *idx ) {
+  unsigned long i;
+  for ( i = 0; i < idx->size; i++ ) {
+    printf( "%f\n", idx->data[i]->anchor_dist[0] );
+  }
+}
+
+static void
+histogram( const struct phash *data, unsigned anchor,
+           unsigned *hist, size_t hsize, double *pmin, double *pmax,
+           double *pstep ) {
+  const struct phash *ph;
+  double min, max, step;
+  unsigned i;
+
+  min = max = data->anchor_dist[anchor];
+
+  for ( ph = data->next; ph; ph = ph->next ) {
+    min = MIN( min, ph->anchor_dist[anchor] );
+    max = MAX( max, ph->anchor_dist[anchor] );
+  }
+
+  step = ( max - min ) / hsize;
+
+  for ( i = 0; i < hsize; i++ ) {
+    hist[i] = 0;
+  }
+
+  for ( ph = data; ph; ph = ph->next ) {
+    hist[( int ) ( ( ph->anchor_dist[anchor] - min ) / step )]++;
+  }
+
+  *pmin = min;
+  *pmax = max;
+  *pstep = step;
+}
+
+static unsigned
+max_hist_slot( const unsigned *hist, size_t hsize ) {
+  unsigned i, best = 0, best_slot = 0;
+
+  for ( i = 0; i < hsize; i++ ) {
+    if ( hist[i] > best ) {
+      best = hist[i];
+      best_slot = i;
+    }
+  }
+
+  return best_slot;
+}
+
+static void
+prox_init( const struct index *idx, double dist, unsigned anchor,
+           struct prox_iter *iter ) {
+  unsigned long lo, hi, mid = 0;
+
+  for ( lo = 0, hi = idx->size; lo < hi; ) {
+    mid = ( lo + hi ) / 2;
+    double ad = idx->data[mid]->anchor_dist[anchor];
+    if ( ad < dist ) {
+      lo = ++mid;
+    }
+    else if ( ad >= dist ) {
+      hi = mid;
+    }
+  }
+
+  iter->idx = idx;
+  iter->dist = dist;
+  iter->anchor = anchor;
+  iter->pos_lo = mid;
+  iter->pos_hi = mid + 1;
+}
+
+#define SLOT_DIST(iter, pos) \
+  fabs( iter->idx->data[pos]->anchor_dist[iter->anchor] - iter->dist )
+
+static struct phash *
+prox_next( struct prox_iter *iter ) {
+  if ( iter->pos_lo >= 0 &&
+       ( iter->pos_hi >= ( long ) iter->idx->size ||
+         SLOT_DIST( iter, iter->pos_lo ) <= SLOT_DIST( iter, iter->pos_hi )
+        ) ) {
+    return iter->idx->data[iter->pos_lo--];
+  }
+
+  if ( iter->pos_hi < ( long ) iter->idx->size ) {
+    return iter->idx->data[iter->pos_hi++];
+  }
+
+  return NULL;
+}
+
+static void
+bits_to_anchor( const struct phash *ph, double *c ) {
+  unsigned i;
+  for ( i = 0; i < HASH_LEN; i++ ) {
+    c[i] = GET_DIM( ph, i );
+  }
+}
+
+static void
+interp_anchor( double *this, const double *that, double ratio ) {
+  unsigned i;
+  for ( i = 0; i < HASH_LEN; i++ ) {
+    this[i] = this[i] * ( 1 - ratio ) + that[i] * ratio;
+  }
+}
+
+static struct index *
+compute_anchors( struct phash *data ) {
+  double anchor[ANCHORS][HASH_LEN];
+  struct index *idx;
+  unsigned hist[HIST_SIZE];
+  double min, max, step;
+  double best_dist, dist_step, next_dist, cur_dist;
+  unsigned slot, i;
+  struct prox_iter iter;
+  struct phash *ph;
+
+  centre( data, anchor[0] );
+  compute_distance( data, 0, anchor[0] );
+
+  idx = new_index( data, by_c_distance );
+  sort_index( idx );
+
+  histogram( data, 0, hist, HIST_SIZE, &min, &max, &step );
+  slot = max_hist_slot( hist, HIST_SIZE );
+  best_dist = min + step * slot + step / 2;
+
+  dist_step = ( max - min ) / ( ANCHORS * 5 );
+  next_dist = 0;
+
+  prox_init( idx, best_dist, 0, &iter );
+  for ( i = 1; i < ANCHORS; i++ ) {
+  next:
+    if ( ph = prox_next( &iter ), !ph )
+      break;
+    cur_dist = fabs( best_dist - ph->anchor_dist[0] );
+    if ( cur_dist < next_dist )
+      goto next;
+    next_dist = cur_dist + dist_step;
+    bits_to_anchor( ph, anchor[i] );
+    interp_anchor( anchor[i], anchor[0], 0.5 );
+    compute_distance( data, i, anchor[i] );
+  }
+
+  return idx;
+}
+
+static struct correlation *
+correlate2( const struct index *idx, size_t nent, size_t * nused,
+            unsigned maxdist ) {
+  struct correlation *c = new_correlation( nent );
+  const struct phash *pi, *pj;
+  struct prox_iter iter;
+  unsigned char bitcount[65536];
+  unsigned long i;
+  unsigned distance;
+  unsigned j;
+  double mindist;
+
+  /* stats */
+  unsigned long n_done = 0;
+  unsigned long n_cut = 0;
+  unsigned long n_skip = 0;
+  unsigned long n_dist = 0;
+  unsigned long n_insert = 0;
+
+  *nused = 0;
+
+  compute_bitcount( bitcount );
+
+  for ( i = 0; i < idx->size; i++ ) {
+    n_done++;
+    pi = idx->data[i];
+    prox_init( idx, pi->anchor_dist[0], 0, &iter );
+
+    for ( ;; ) {
+    next:
+      if ( pj = prox_next( &iter ), !pj )
+        break;
+
+      if ( pj == pi )
+        goto next;
+
+      mindist = ANCHOR_MINDIST( pi, pj, 0 );
+
+      if ( mindist > maxdist ) {
+        n_cut++;
+        break;
+      }
+
+      for ( j = 1; j < ANCHORS; j++ ) {
+        mindist = MAX( mindist, ANCHOR_MINDIST( pi, pj, j ) );
+        if ( mindist > maxdist ) {
+          n_skip++;
+          goto next;
+        }
+      }
+
+      distance = hash_distance( pi, pj, bitcount );
+      n_dist++;
+      if ( distance < mindist ) {
+        mention( "Interesting! distance = %u, mindist = %f", distance,
+                 mindist );
+      }
+      if ( distance <= maxdist ) {
+        n_insert++;
+        insert_correlation( c, nent, nused, pi, pj, distance );
+      }
+    }
+  }
+
+  mention( "n_done   = %10lu Total number of items processed\n"
+           "n_cut    = %10lu Search short-circuited\n"
+           "n_skip   = %10lu Match invalidated early\n"
+           "n_dist   = %10lu Bitwise distance computed\n"
+           "n_insert = %10lu Vector pair inserted\n",
+           n_done, n_cut, n_skip, n_dist, n_insert );
+
+  return c;
 }
 
 static struct correlation *
@@ -374,6 +666,7 @@ usage( void ) {
   fprintf( stderr, "Usage: " PROG " [options] < dump\n\n"
            "Options:\n"
            "  -K, --keep    <N> Number of matches to keep (default 1000)\n"
+           "  -M, --max     <N> Maximum distance to consider a match\n"
            "  -v, --verbose     Verbose output\n"
            "  -h, --help        See this text\n" );
   exit( 1 );
@@ -383,13 +676,16 @@ int
 main( int argc, char *argv[] ) {
   struct phash *data;
   struct correlation *c;
+  struct index *idx;
   size_t nent = 1000, nused, count = 0;
+  unsigned maxdist = 100;
   int ch;
 
   static struct option opts[] = {
     {"help", no_argument, NULL, 'h'},
     {"verbose", no_argument, NULL, 'v'},
     {"keep", required_argument, NULL, 'K'},
+    {"max", required_argument, NULL, 'M'},
     {NULL, 0, NULL, 0}
   };
 
@@ -397,6 +693,15 @@ main( int argc, char *argv[] ) {
     switch ( ch ) {
     case 'v':
       verbose++;
+      break;
+    case 'M':
+      {
+        char *ep;
+        maxdist = strtod( optarg, &ep );
+        if ( *ep ) {
+          die( "Bad number" );
+        }
+      }
       break;
     case 'K':
       {
@@ -433,16 +738,23 @@ main( int argc, char *argv[] ) {
     data = read_file( stdin, &count );
   }
 
+  if ( !data ) {
+    die( "No data loaded" );
+  }
+
+  idx = compute_anchors( data );
+/*  print_index( idx );*/
+
   mention( "Looking for %lu correlations in %lu files",
            ( unsigned long ) nent, ( unsigned long ) count );
 
 #ifdef DEBUG
   dump_phash( data );
+#else
+  c = correlate2( idx, nent, &nused, maxdist );
+  show_correlation( c, nused );
 #endif
 
-  show_centre( data );
-/*  c = correlate( data, nent, &nused );*/
-/*  show_correlation( c, nused );*/
   free_phash( data );
 
   return 0;
