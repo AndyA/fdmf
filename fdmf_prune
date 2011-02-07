@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use Getopt::Long;
-use Storable qw( nstore );
+use Storable qw( nstore retrieve );
 
 my %Opt = (
   verbose => 0,
