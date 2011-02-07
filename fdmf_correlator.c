@@ -329,6 +329,18 @@ best_distance( const struct phash *pi, const struct phash *pj ) {
 }
 
 static double
+anchor_anchor_distance( const double ci[HASH_LEN],
+                        const double cj[HASH_LEN] ) {
+  double dist = 0;
+  unsigned i;
+  for ( i = 0; i < HASH_LEN; i++ ) {
+    double dd = ci[i] - cj[i];
+    dist += dd * dd;
+  }
+  return dist;
+}
+
+static double
 anchor_distance( const struct phash *ph, const double c[HASH_LEN] ) {
   double dist = 0;
   unsigned i;
@@ -662,9 +674,25 @@ correlate2( struct phash *data, const struct index *idx, size_t nent,
 
       {
         double min, max;
-        unsigned dist = hash_distance( pi, pj, bitcount );
+        double ci[HASH_LEN], cj[HASH_LEN];
+        double dist;
+        bits_to_anchor( pi, ci );
+        bits_to_anchor( pj, cj );
+        dist = anchor_anchor_distance( ci, cj );
         anchor_bounds( pi, pj, &min, &max );
-        mention( "%f <= %u <= %f", min, dist, max );
+        if ( min > dist )
+          mention( "min > dist, %f > %f", min, dist );
+        if ( dist > max )
+          mention( "dist > max, %f > %f", dist, max );
+        if ( min > dist || dist > max ) {
+          unsigned i;
+          for ( i = 0; i < ANCHORS; i++ ) {
+            mention( "%2d: d1=%f, d2=%f, mindist=%f, maxdist=%f",
+                     i, pi->anchor_dist[i], pj->anchor_dist[i],
+                     ANCHOR_MINDIST( pi, pj, i ),
+                     ANCHOR_MAXDIST( pi, pj, i ) );
+          }
+        }
       }
 
       for ( j = 0; j < ANCHORS; j++ ) {
