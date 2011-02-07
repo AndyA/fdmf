@@ -24,8 +24,11 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define ANCHOR_MINDIST(pi, ph, anchor) \
+#define ANCHOR_MINDIST(pi, pj, anchor) \
   fabs( (pi)->anchor_dist[anchor] - (pj)->anchor_dist[anchor] )
+
+#define ANCHOR_MAXDIST(pi, pj, anchor) \
+  ((pi)->anchor_dist[anchor] + (pj)->anchor_dist[anchor])
 
 #define GET_DIM(ph, bit) \
   (( (ph)->bits[(bit) >> 3] & ( 1 << ( (bit) & 7 ) ) ) ? 1 : 0)
@@ -597,6 +600,20 @@ compute_anchors( struct phash *data ) {
   return idx;
 }
 
+static void
+anchor_bounds( const struct phash *pi, const struct phash *pj,
+               double *pmin, double *pmax ) {
+  unsigned i;
+  double min = ANCHOR_MINDIST( pi, pj, 0 );
+  double max = ANCHOR_MAXDIST( pi, pj, 0 );
+  for ( i = 1; i < ANCHORS; i++ ) {
+    min = MAX( min, ANCHOR_MINDIST( pi, pj, i ) );
+    max = MIN( max, ANCHOR_MAXDIST( pi, pj, i ) );
+  }
+  *pmin = min;
+  *pmax = max;
+}
+
 static struct correlation *
 correlate2( struct phash *data, const struct index *idx, size_t nent,
             size_t * nused, unsigned maxdist ) {
@@ -642,6 +659,13 @@ correlate2( struct phash *data, const struct index *idx, size_t nent,
 
       if ( pj == pi )
         goto next;
+
+      {
+        double min, max;
+        unsigned dist = hash_distance( pi, pj, bitcount );
+        anchor_bounds( pi, pj, &min, &max );
+        mention( "%f <= %u <= %f", min, dist, max );
+      }
 
       for ( j = 0; j < ANCHORS; j++ ) {
         if ( ANCHOR_MINDIST( pi, pj, j ) > maxdist ) {
