@@ -4,7 +4,12 @@ CC =  gcc
 OPTIMIZE=-O3
 CFLAGS = $(OPTIMIZE) -W -Wall -I/usr/local/include -L/usr/local/lib -I/opt/local/include -L/opt/local/lib
 
-all: fdmf_sonic_reducer fdmf_correlator
+all: fdmf_sonic_reducer fdmf_correlator tools/closure
+
+tools/closure.o: tools/closure.h
+
+tools/closure: tools/closure.o
+	$(CC) $(CFLAGS) $< -o $@
 
 fdmf_correlator: fdmf_correlator.o
 	$(CC) $(CFLAGS) $< -o $@
