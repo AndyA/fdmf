@@ -5,16 +5,7 @@ use warnings;
 
 use Data::Dumper;
 
-my @args = parse_args(
-  "const void *a, const void *b, context unsigned anchor" );
-
-my $spec = {
-  name   => 'foo',
-  return => 'int',
-  args   => \@args,
-  slots  => 20,
-};
-
+my $spec = parse_spec_file( 'tools/foo.cl' );
 my %tpl = ( c => 'tools/closure.c', h => 'tools/closure.h', );
 
 while ( my ( $ext, $tpl ) = each %tpl ) {
@@ -75,7 +66,7 @@ sub make_vars {
        grep { $_->{is_context} } @{ $spec->{args} };
     },
     CLEANUP_ARGS => sub {
-      join ', ', map { "slot[i].$_" } map { $_->{name} }
+      join ', ', map { "data[i].$_" } map { $_->{name} }
        grep { $_->{is_context} } @{ $spec->{args} };
     },
     CTX_COPY_STMT => sub {
@@ -104,7 +95,8 @@ sub make_vars {
     },
     CLOSURE_TABLE => sub {
       join ",\n",
-       map { "  {$_, closure_$_, NULL, NULL}" } 0 .. $spec->{slots} - 1;
+       map { "  {" . ( $_ + 1 ) . ", closure_$_, NULL, NULL}" }
+       0 .. $spec->{slots} - 1;
     },
     CLOSURE_DEFINITIONS => sub {
       map {
@@ -114,22 +106,6 @@ sub make_vars {
     },
   };
 }
-
-=for ref
-
-typedef int (*closure)(int x, int (*foo)(int dc[], void *h));
-
-closure new_closure( int (*coderef)(int x, void *h, int (*foo)(int dc[], void *h), void *h) {
-}
-
-void free_closure( closure c ) {
-}
-
-static int closure_0(int x, int (*foo)(int dc[], void *h)) {
-  return slot[0].code( x, slot[0].h, foo );
-}
-
-=cut
 
 sub parse_args {
   my @args = split_args( @_ );
@@ -170,6 +146,37 @@ sub split_args {
     s/\s+/ /g;
   }
   return @arg;
+}
+
+sub parse_spec_file {
+  my $name = shift;
+  open my $fh, '<', $name or die "Can't read $name: $!\n";
+  return parse_spec( $fh );
+}
+
+sub parse_spec {
+  my $fh   = shift;
+  my $spec = {};
+  while ( defined( my $line = <$fh> ) ) {
+    chomp $line;
+    next if $line =~ /^\s*$/;
+    next if $line =~ /^\s*#/;
+    if ( $line =~ /^(\w+)\s*[:=]\s*(.*)/ ) {
+      my ( $k, $v ) = ( $1, $2 );
+      $v =~ s/\s+$//;
+      $spec->{$k} = $v;
+    }
+    elsif ( $line =~ /^(.*?)\s+(\w+)\s*\((.*)\)\s*;\s*$/ ) {
+      my ( $ret, $name, $args ) = ( $1, $2, $3 );
+      $spec->{name}   = $name;
+      $spec->{return} = $ret;
+      $spec->{args}   = [ parse_args( $args ) ];
+    }
+    else {
+      die "Can't parse $line\n";
+    }
+  }
+  return $spec;
 }
 
 # vim:ts=2:sw=2:sts=2:et:ft=perl
