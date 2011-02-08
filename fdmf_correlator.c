@@ -59,36 +59,6 @@ struct prox_iter {
 
 static int verbose = 0;
 
-#define BY_ANCHOR_DISTANCE(d)                                        \
-  static int                                                         \
-  by_anchor_distance_ ## d ( const void *a, const void *b ) {        \
-    const struct phash *pa = *( ( const struct phash ** ) a );       \
-    const struct phash *pb = *( ( const struct phash ** ) b );       \
-    return pa->anchor_dist[d] < pb->anchor_dist[d] ? -1              \
-        : pa->anchor_dist[d] > pb->anchor_dist[d] ? 1 : 0;           \
-  }
-
-BY_ANCHOR_DISTANCE( 0 )
-    BY_ANCHOR_DISTANCE( 1 )
-    BY_ANCHOR_DISTANCE( 2 )
-    BY_ANCHOR_DISTANCE( 3 )
-    BY_ANCHOR_DISTANCE( 4 )
-    BY_ANCHOR_DISTANCE( 5 )
-    BY_ANCHOR_DISTANCE( 6 )
-    BY_ANCHOR_DISTANCE( 7 )
-
-typedef int ( *compar_func ) ( const void *a, const void *b );
-static compar_func anchor_cf[ANCHORS] = {
-  by_anchor_distance_0,
-  by_anchor_distance_1,
-  by_anchor_distance_2,
-  by_anchor_distance_3,
-  by_anchor_distance_4,
-  by_anchor_distance_5,
-  by_anchor_distance_6,
-  by_anchor_distance_7
-};
-
 static void
 mention( const char *msg, ... ) {
   va_list ap;
@@ -550,6 +520,14 @@ interp_anchor( double *this, const double *that, double ratio ) {
   }
 }
 
+static int
+by_anchor_distance( const void *a, const void *b, unsigned which ) {
+  const struct phash *pa = *( ( const struct phash ** ) a );
+  const struct phash *pb = *( ( const struct phash ** ) b );
+  return pa->anchor_dist[which] < pb->anchor_dist[which] ? -1
+      : pa->anchor_dist[which] > pb->anchor_dist[which] ? 1 : 0;
+}
+
 static struct index *
 compute_anchors( struct phash *data ) {
   double anchor[ANCHORS][HASH_LEN];
@@ -564,7 +542,7 @@ compute_anchors( struct phash *data ) {
   centre( data, anchor[0] );
   compute_distance( data, 0, anchor[0] );
 
-  idx = new_index( data, anchor_cf[0] );
+  idx = new_index( data, new_anchor_compar( by_anchor_distance, 0 ) );
   sort_index( idx );
 
   for ( i = 1; i < ANCHORS; i++ ) {
@@ -630,7 +608,7 @@ correlate2( struct phash *data, const struct index *idx, size_t nent,
 
   compute_bitcount( bitcount );
 
-  idx2 = new_index( data, anchor_cf[which] );
+  idx2 = new_index( data, new_anchor_compar( by_anchor_distance, which ) );
 
   for ( i = 0; i < idx->size; i++ ) {
     n_done++;
