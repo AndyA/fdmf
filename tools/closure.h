@@ -5,15 +5,16 @@
 
 /* <skip> */
 #define ALL_PROTO       int x, void *h
+#define CTX_ARGS        h
+#define CLEANUP_ARGS    slot[i].h
 #define CTX_PROTO       void *h
 #define CTX_PROTO_STMT  void *h
+#define CTX_COPY_STMT   slot[s].h = h
 #define PASS_PROTO      int x
 #define CALL_ARGS(n)    x, slot[n].h
 #define RETURN          int
-#define SLOTS           2
+#define NSLOTS          2
 /* </skip> */
-
-#define NAME_SLOTS      SLOTS
 
 typedef RETURN( *NAME ) ( PASS_PROTO );
 

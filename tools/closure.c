@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#define SLOTS NSLOTS
+
 struct closure_slot {
   unsigned next;
   NAME cl;
@@ -22,10 +24,10 @@ static RETURN closure_1( PASS_PROTO );
 /* </skip> */
 /* <include block="CLOSURE_PROTOTYPES" /> */
 
-static struct closure_slot slot[NAME_SLOTS] = {
+static struct closure_slot slot[SLOTS] = {
 /* <skip> */
-  {1, closure_0, NULL, NULL, NULL},
-  {2, closure_1, NULL, NULL, NULL},
+  {1, closure_0, NULL, NULL},
+  {2, closure_1, NULL, NULL},
 /* </skip> */
 /* <include block="CLOSURE_TABLE" /> */
 };
@@ -51,28 +53,28 @@ NAME
 new_NAME_cleanup( RETURN( *code ) ( ALL_PROTO ), CTX_PROTO,
                   void ( *cleanup ) ( CTX_PROTO ) ) {
   unsigned s;
-  if ( free_slot == NAME_SLOTS )
+  if ( free_slot == SLOTS )
     return NULL;
   s = free_slot;
   free_slot = slot[s].next;
-  slot[s].next = NAME_SLOTS + 1;
+  slot[s].next = SLOTS + 1;
   slot[s].code = code;
   slot[s].cleanup = cleanup;
-  slot[s].h = h;
+  CTX_COPY_STMT;
 
   return slot[s].cl;
 }
 
 NAME
 new_NAME( RETURN( *code ) ( ALL_PROTO ), CTX_PROTO ) {
-  return new_NAME_cleanup( code, h, NULL );
+  return new_NAME_cleanup( code, CTX_ARGS, NULL );
 }
 
 static unsigned
 are_ordered( void ) {
   unsigned long long last_cl = 0;
   unsigned i;
-  for ( i = 0; i < NAME_SLOTS; i++ ) {
+  for ( i = 0; i < SLOTS; i++ ) {
     unsigned long long cl = ( unsigned long long ) slot[i].cl;
     if ( cl < last_cl )
       return 2;
@@ -105,10 +107,10 @@ free_NAME( NAME cl ) {
 
   if ( order_known == 1 ) {
     struct closure_slot key = {
-      0, cl, NULL, NULL, NULL
+      0, cl, NULL, NULL
     };
     struct closure_slot *sl =
-        bsearch( &key, slot, NAME_SLOTS, sizeof( struct closure_slot ),
+        bsearch( &key, slot, SLOTS, sizeof( struct closure_slot ),
                  by_addr );
     if ( sl ) {
       i = sl - slot;
@@ -116,7 +118,7 @@ free_NAME( NAME cl ) {
     }
   }
   else if ( order_known == 2 ) {
-    for ( i = 0; i < NAME_SLOTS; i++ ) {
+    for ( i = 0; i < SLOTS; i++ ) {
       if ( slot[i].cl == cl ) {
         goto free_it;
       }
@@ -126,10 +128,10 @@ free_NAME( NAME cl ) {
   bad_free(  );
 
 free_it:
-  if ( slot[i].next != NAME_SLOTS + 1 )
+  if ( slot[i].next != SLOTS + 1 )
     bad_free(  );
   if ( slot[i].cleanup ) {
-    slot[i].cleanup( slot[i].h );
+    slot[i].cleanup( CLEANUP_ARGS );
     slot[i].cleanup = NULL;
   }
   slot[i].next = free_slot;
