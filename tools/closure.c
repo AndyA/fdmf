@@ -15,7 +15,10 @@ struct closure_slot {
   NAME cl;
    RETURN( *code ) ( ALL_PROTO );
   void ( *cleanup ) ( CTX_PROTO );
-   CTX_PROTO_STMT;
+};
+
+struct closure_data {
+  CTX_PROTO_STMT;
 };
 
 /* <skip> */
@@ -31,6 +34,8 @@ static struct closure_slot slot[SLOTS] = {
 /* </skip> */
 /* <include block="CLOSURE_TABLE" /> */
 };
+
+static struct closure_data data[SLOTS];
 
 static unsigned free_slot = 0;
 static unsigned order_known = 0;
