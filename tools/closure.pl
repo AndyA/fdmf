@@ -3,16 +3,17 @@
 use strict;
 use warnings;
 
-use Data::Dumper;
+use Getopt::Long;
 
-my $spec = parse_spec_file( 'tools/foo.cl' );
+GetOptions() or die "Bad options\n";
+die "Usage: closure.pl <specfile.cl>\n" unless @ARGV == 1;
+my $spec = parse_spec_file( $ARGV[0] );
 my %tpl = ( c => 'tools/closure.c', h => 'tools/closure.h', );
 
 while ( my ( $ext, $tpl ) = each %tpl ) {
   my $name = $spec->{name} . '.' . $ext;
   open my $fh, '>', $name or die "Can't write $name: $!\n";
   print $fh fix_file( $spec, $tpl );
-  print "Wrote $name\n";
 }
 
 sub fix_file {
