@@ -40,6 +40,18 @@ static struct closure_data data[SLOTS];
 static unsigned free_slot = 0;
 static unsigned order_known = 0;
 
+#if defined( THREADED_CLOSURES ) || defined( THREADED_NAME )
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t try_again = PTHREAD_COND_INITIALIZER;
+#define new_closure_cleanup new_NAME_cleanup_nts
+#define new_closure         new_NAME_nts
+#define free_closure        free_NAME_nts
+#else
+#define new_closure_cleanup new_NAME_cleanup
+#define new_closure         new_NAME
+#define free_closure        free_NAME
+#endif
+
 /* <skip> */
 static RETURN
 closure_0( PASS_PROTO ) {
@@ -55,8 +67,8 @@ closure_1( PASS_PROTO ) {
 /* <include block="CLOSURE_DEFINITIONS" /> */
 
 NAME
-new_NAME_cleanup( RETURN( *code ) ( ALL_PROTO ), CTX_PROTO,
-                  void ( *cleanup ) ( CTX_PROTO ) ) {
+new_closure_cleanup( RETURN( *code ) ( ALL_PROTO ), CTX_PROTO,
+                     void ( *cleanup ) ( CTX_PROTO ) ) {
   unsigned s;
   if ( free_slot == SLOTS )
     return NULL;
@@ -71,7 +83,7 @@ new_NAME_cleanup( RETURN( *code ) ( ALL_PROTO ), CTX_PROTO,
 }
 
 NAME
-new_NAME( RETURN( *code ) ( ALL_PROTO ), CTX_PROTO ) {
+new_closure( RETURN( *code ) ( ALL_PROTO ), CTX_PROTO ) {
   return new_NAME_cleanup( code, CTX_ARGS, NULL );
 }
 
@@ -104,7 +116,7 @@ by_addr( const void *a, const void *b ) {
 }
 
 void
-free_NAME( NAME cl ) {
+free_closure( NAME cl ) {
   unsigned i;
 
   if ( !order_known )
@@ -143,6 +155,46 @@ free_it:
   free_slot = i;
 }
 
+#if defined( THREADED_CLOSURES ) || defined( THREADED_NAME )
+NAME
+new_NAME_cleanup( RETURN( *code ) ( ALL_PROTO ), CTX_PROTO,
+                  void ( *cleanup ) ( CTX_PROTO ) ) {
+  return new_NAME_nb( code, cleanup, 0 );
+}
+
+NAME
+new_NAME( RETURN( *code ) ( ALL_PROTO ), CTX_PROTO ) {
+  return new_NAME_nb( code, NULL, 0 );
+}
+
+void
+free_NAME( NAME cl ) {
+  pthread_mutex_lock( lock );
+  free_closure( cl );
+  pthread_mutex_unlock( lock );
+  pthread_cond_signal( try_again );
+}
+
+NAME
+new_NAME_nb( RETURN( *code ) ( ALL_PROTO ), CTX_PROTO,
+             void ( *cleanup ) ( CTX_PROTO ), unsigned timeout ) {
+  NAME cl;
+  pthread_mutex_lock( lock );
+  if ( free_slot == SLOTS ) {
+    /* TODO do something other than wait forever if the timeout != 0 */
+    if ( timeout == 0 ) {
+      pthread_mutex_unlock( lock );
+      return NULL;
+    }
+    pthread_cond_wait( try_again, lock );
+  }
+  cl = new_closure_cleanup( code, cleanup );
+  pthread_mutex_unlock( lock );
+  return cl;
+}
+
+#endif
+
 /* <skip> */
 
 static RETURN
@@ -175,5 +227,6 @@ main( void ) {
 }
 
 /* </skip> */
+
 /* vim:ts=2:sw=2:sts=2:et:ft=c 
  */
