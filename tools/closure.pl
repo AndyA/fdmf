@@ -61,7 +61,7 @@ sub make_vars {
   my $call_args = sub {
     my $slot = shift;
     join ', ',
-     map { $_->{is_context} ? "slot[$slot].$_->{name}" : $_->{name} }
+     map { $_->{is_context} ? "data[$slot].$_->{name}" : $_->{name} }
      @{ $spec->{args} };
   };
   return {
@@ -79,7 +79,7 @@ sub make_vars {
        grep { $_->{is_context} } @{ $spec->{args} };
     },
     CTX_COPY_STMT => sub {
-      join ";\n", map { "slot[s].$_ = $_" }
+      join ";\n", map { "data[s].$_ = $_" }
        map  { $_->{name} }
        grep { $_->{is_context} } @{ $spec->{args} };
     },
