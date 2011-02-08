@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "anchor_compar.h"
+
 #define PROG "fdmf_correlator"
 #define HASH_LEN 768
 #define HASH_BYTES (HASH_LEN / 8)

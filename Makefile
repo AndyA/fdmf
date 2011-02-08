@@ -11,14 +11,22 @@ tools/closure.o: tools/closure.h
 tools/closure: tools/closure.o
 	$(CC) $(CFLAGS) $< -o $@
 
-fdmf_correlator: fdmf_correlator.o
-	$(CC) $(CFLAGS) $< -o $@
+anchor_compar.c anchor_compar.h : anchor_compar.cl
+	perl tools/closure.pl anchor_compar.cl
+
+fdmf_correlator.c: anchor_compar.h
+
+fdmf_correlator: fdmf_correlator.o anchor_compar.o
+	$(CC) $(CFLAGS) $+ -o $@
 
 fdmf_sonic_reducer: fdmf_sonic_reducer.o
-	$(CC) $(CFLAGS) -lfftw3 -lm $< -o $@
+	$(CC) $(CFLAGS) -lfftw3 -lm $+ -o $@
 
 clean:  
-	rm -f *.o fdmf_sonic_reducer fdmf_correlator $(OBJS) tags *.gcda *.gcno *.gcov *.o *.out
+	rm -f *.o \
+	  fdmf_sonic_reducer fdmf_correlator \
+	  $(OBJS) tags *.gcda *.gcno *.gcov *.o *.out \
+	  anchor_compar.c anchor_compar.h
 
 .PHONY: tags
 tags:

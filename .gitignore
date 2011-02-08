@@ -5,6 +5,8 @@
 *.out
 .*.swp
 Session.vim
+anchor_compar.c
+anchor_compar.h
 bm
 cmd.log
 db
@@ -18,5 +20,5 @@ fdmf_sonic_reducer
 fdmf_vector_pairs
 report
 tags
-wrk
 tools/closure
+wrk
