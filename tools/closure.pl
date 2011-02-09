@@ -42,8 +42,11 @@ sub fix_file {
     }
   }
   my $body = join "\n", @body;
-  my $patn = '('
-   . join( '|', sort { length $b <=> length $a } keys %$ctx ) . ')';
+  my $patn
+   = '('
+   . join( '|',
+    sort { length $b <=> length $a || $a cmp $b } keys %$ctx )
+   . ')';
   $body =~ s/$patn/$ctx->{$1}()/eg;
   return $body;
 }
