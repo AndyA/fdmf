@@ -5,8 +5,10 @@
 /* </skip> */
 /* <include block="INCLUDE_HEADER" /> */
 
+#include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/time.h>
 
 #define SLOTS NSLOTS
 
@@ -159,37 +161,57 @@ free_it:
 NAME
 new_NAME_cleanup( RETURN( *code ) ( ALL_PROTO ), CTX_PROTO,
                   void ( *cleanup ) ( CTX_PROTO ) ) {
-  return new_NAME_nb( code, cleanup, 0 );
+  return new_NAME_nb( code, CTX_ARGS, cleanup, 0 );
 }
 
 NAME
 new_NAME( RETURN( *code ) ( ALL_PROTO ), CTX_PROTO ) {
-  return new_NAME_nb( code, NULL, 0 );
+  return new_NAME_nb( code, CTX_ARGS, NULL, 0 );
 }
 
 void
 free_NAME( NAME cl ) {
-  pthread_mutex_lock( lock );
+  pthread_mutex_lock( &lock );
   free_closure( cl );
-  pthread_mutex_unlock( lock );
-  pthread_cond_signal( try_again );
+  pthread_mutex_unlock( &lock );
+  pthread_cond_signal( &try_again );
 }
 
 NAME
 new_NAME_nb( RETURN( *code ) ( ALL_PROTO ), CTX_PROTO,
              void ( *cleanup ) ( CTX_PROTO ), unsigned timeout ) {
   NAME cl;
-  pthread_mutex_lock( lock );
+  pthread_mutex_lock( &lock );
   if ( free_slot == SLOTS ) {
     /* TODO do something other than wait forever if the timeout != 0 */
     if ( timeout == 0 ) {
-      pthread_mutex_unlock( lock );
+      pthread_mutex_unlock( &lock );
       return NULL;
     }
-    pthread_cond_wait( try_again, lock );
+    else if ( timeout == UINT_MAX ) {
+      pthread_cond_wait( &try_again, &lock );
+    }
+    else {
+      struct timeval tv;
+      struct timespec ts;
+
+      gettimeofday( &tv, NULL );
+
+      ts.tv_sec = tv.tv_sec + timeout / 1000;
+      ts.tv_nsec = ( tv.tv_usec + ( timeout % 1000 ) * 1000 ) * 1000;
+      if ( ts.tv_nsec > 1000000000 ) {
+        ts.tv_nsec -= 1000000000;
+        ts.tv_sec++;
+      }
+
+      if ( pthread_cond_timedwait( &try_again, &lock, &ts ) ) {
+        pthread_mutex_unlock( &lock );
+        return NULL;
+      }
+    }
   }
-  cl = new_closure_cleanup( code, cleanup );
-  pthread_mutex_unlock( lock );
+  cl = new_closure_cleanup( code, CTX_ARGS, cleanup );
+  pthread_mutex_unlock( &lock );
   return cl;
 }
 

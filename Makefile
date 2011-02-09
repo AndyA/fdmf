@@ -2,7 +2,8 @@ CC =  gcc
 # Use OPTIMIZE="-g3" for debug build
 # Use OPTIMIZE="-fprofile-arcs -ftest-coverage" for gcov build
 OPTIMIZE=-O3
-CFLAGS = $(OPTIMIZE) -W -Wall -I/usr/local/include -L/usr/local/lib -I/opt/local/include -L/opt/local/lib
+DEFINES=-DTHREADED_CLOSURES
+CFLAGS = $(DEFINES) $(OPTIMIZE) -W -Wall -I/usr/local/include -L/usr/local/lib -I/opt/local/include -L/opt/local/lib
 
 all: fdmf_sonic_reducer fdmf_correlator tools/closure
 
