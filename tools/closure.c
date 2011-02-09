@@ -12,6 +12,8 @@
 
 #define SLOTS NSLOTS
 
+#define SLOTS NSLOTS
+
 struct closure_slot {
   unsigned next;
   NAME cl;
